@@ -58,10 +58,18 @@ interface Face {
     lightmapOffset: number;
 }
 
+interface Plane {
+    x: number;
+    y: number;
+    z: number;
+    dist: number;
+    type: number;
+}
+
 interface BSP {
     vertices: Vector3D[];
     edges: number[][];
-    planes: any[];
+    planes: Plane[];
     faces: Face[];
     surfEdges: number[];
 }

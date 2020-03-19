@@ -73,6 +73,21 @@ export class FlyControls {
         this.domElement.addEventListener('mousedown', this._mousedown, false);
         this.domElement.addEventListener('mouseup', this._mouseup, false);
 
+        this.domElement.addEventListener('pointerlockchange', lockChangeAlert, false);
+        this.domElement.addEventListener('mozpointerlockerror', lockChangeAlert, false);
+
+
+        function lockChangeAlert() {
+            if (this.domElement.pointerLockElement === this.domElement) {
+                // Do something useful in response
+            }
+            else {
+                // Do something useful in response
+                this.moving = false;
+                console.log("released");
+            }
+        }
+
         window.addEventListener('keydown', this._keydown, false);
         window.addEventListener('keyup', this._keyup, false);
 
@@ -84,12 +99,8 @@ export class FlyControls {
     keydown(event: any) {
 
         if (event.altKey) {
-
             return;
-
         }
-
-        //event.preventDefault();
 
         switch (event.keyCode) {
 
@@ -164,8 +175,8 @@ export class FlyControls {
 
         if (this.moving) {
 
-            var xAxis = new THREE.Vector3(1 ,0 ,0);
-            var yAxis = new THREE.Vector3(0 ,1 ,0);
+            var xAxis = new THREE.Vector3(1, 0, 0);
+            var yAxis = new THREE.Vector3(0, 1, 0);
 
             this.camera.rotateOnAxis(xAxis, event.movementY * -0.005);
             this.camera.rotateOnWorldAxis(yAxis, event.movementX * -0.005);
@@ -204,19 +215,13 @@ export class FlyControls {
 
 
     bind(scope: any, fn: any) {
-
         return function () {
-
             fn.apply(scope, arguments);
-
         };
-
     }
 
     contextmenu(event: any) {
-
         event.preventDefault();
-
     }
 
     dispose() {

@@ -26,27 +26,41 @@ fetch("/bsp/c1a0.bsp").then(async (response) => {
 
 
     bsp.faces.forEach(face => {
-        
+
         let firstEdgeIndex = face.firstEdge;
         var geometry = new THREE.Geometry();
 
         for (let i = 0; i < face.edges; i++) {
 
             const surfEdge = bsp.surfEdges[firstEdgeIndex + i];
-            
-            if (bsp.edges[surfEdge] === undefined) continue;
-            
-            const v1 = bsp.vertices[bsp.edges[surfEdge][0]];
-            const v2 = bsp.vertices[bsp.edges[surfEdge][1]];
-            
-            geometry.vertices.push(new THREE.Vector3(v1.x, v1.z, v1.y));
-            geometry.vertices.push(new THREE.Vector3(v2.x, v2.z, v2.y));
+            const edge = bsp.edges[Math.abs(surfEdge)];
+
+            let v1 = bsp.vertices[edge[0]];
+            let v2 = bsp.vertices[edge[1]];
+
+            if (surfEdge < 0) {
+                [v1, v2] = [v2, v1];
+            }
+
+            geometry.vertices.push(new THREE.Vector3(v1.y, v1.z, v1.x));
+            geometry.vertices.push(new THREE.Vector3(v2.y, v2.z, v2.x));
 
         }
 
-        const seg = new THREE.LineSegments(geometry, material);
+        const triangles = THREE.ShapeUtils.triangulateShape(geometry.vertices, []);
+
+        if (triangles.length === 0) return;
+
+        for (var i = 0; i < triangles.length; i++) {
+            geometry.faces.push(new THREE.Face3(triangles[i][0], triangles[i][1], triangles[i][2]));
+        }
+
         
-        scene.add(seg);
+
+
+        const mesh = new THREE.Mesh( geometry, material );
+
+        scene.add(mesh);
     });
 
     // bsp.edges.forEach(edge => {
