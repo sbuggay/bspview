@@ -1,4 +1,6 @@
 
+import { extract, typeMapping } from "./binary";
+
 // #define LUMP_ENTITIES      0
 // #define LUMP_PLANES        1
 // #define LUMP_TEXTURES      2
@@ -91,13 +93,15 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         });
     }
 
+
     const edgeView = new DataView(buffer, lumpData["LUMP_EDGES"].offset, lumpData["LUMP_EDGES"].lumpLength);
-    const edges = [];
-    for (let offset = 0; offset < edgeView.byteLength; offset += 4) {
-        const a = edgeView.getUint16(offset, true);
-        const b = edgeView.getUint16(offset + 2, true);
-        edges.push([a, b]);
-    }
+    const edges = extract(edgeView, ["Uint16", "Uint16"]);
+    // const edges = [];
+    // for (let offset = 0; offset < edgeView.byteLength; offset += 4) {
+    //     const a = edgeView.getUint16(offset, true);
+    //     const b = edgeView.getUint16(offset + 2, true);
+    //     edges.push([a, b]);
+    // }
 
     const planeView = new DataView(buffer, lumpData["LUMP_PLANES"].offset, lumpData["LUMP_EDGES"].lumpLength);
     const planes = [];
@@ -155,9 +159,3 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
 
     return bsp;
 }
-
-// function parseVector3D(buffer: ArrayBuffer) {
-//     return {
-//         x: buffer.
-//     }
-// }
