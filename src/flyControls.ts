@@ -77,7 +77,6 @@ export class FlyControls {
         window.addEventListener('keyup', this._keyup, false);
 
         this.updateMovementVector();
-        this.updateRotationVector();
 
         this.moving = false;
     }
@@ -117,7 +116,6 @@ export class FlyControls {
         }
 
         this.updateMovementVector();
-        this.updateRotationVector();
 
     };
 
@@ -148,7 +146,6 @@ export class FlyControls {
         }
 
         this.updateMovementVector();
-        this.updateRotationVector();
 
     };
 
@@ -174,7 +171,6 @@ export class FlyControls {
             this.camera.rotateOnWorldAxis(yAxis, event.movementX * -0.005);
 
 
-            this.updateRotationVector();
         }
 
     };
@@ -206,20 +202,6 @@ export class FlyControls {
         this.moveVector.z = (- forward + this.moveState.back);
     };
 
-    updateRotationVector() {
-        this.rotationVector.x = (- this.moveState.pitchDown + this.moveState.pitchUp);
-        this.rotationVector.y = (- this.moveState.yawRight + this.moveState.yawLeft);
-        this.rotationVector.z = (- this.moveState.rollRight + this.moveState.rollLeft);
-    };
-
-    getContainerDimensions() {
-
-        return {
-            size: [window.innerWidth, window.innerHeight],
-            offset: [0, 0]
-        };
-
-    };
 
     bind(scope: any, fn: any) {
 

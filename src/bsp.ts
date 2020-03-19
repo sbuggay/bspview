@@ -46,10 +46,22 @@ interface Vector3D {
     z: number;
 }
 
+interface Face {
+    plane: number;
+    side: number;
+    firstEdge: number;
+    edges: number;
+    styles: number;
+    textureInfo: number;
+    lightmapOffset: number;
+}
+
 interface BSP {
     vertices: Vector3D[];
     edges: number[][];
     planes: any[];
+    faces: Face[];
+    surfEdges: number[];
 }
 
 export function parseBSP(buffer: ArrayBuffer): BSP {
@@ -104,27 +116,41 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         });
     }
 
-    // const facesView = new DataView(buffer, lumpData["LUMP_FACES"].offset, lumpData["LUMP_FACES"].lumpLength);
-    // const faces = [];
-    // for (let offset = 0; offset < planeView.byteLength; offset += 20) {
-    //     const x = planeView.getFloat32(offset, true);
-    //     const y = planeView.getFloat32(offset + 4, true);
-    //     const z = planeView.getFloat32(offset + 8, true);
-    //     const dist = planeView.getFloat32(offset + 12, true);
-    //     const type = planeView.getUint32(offset + 16, true);
-    //     planes.push({
-    //         x,
-    //         y,
-    //         z,
-    //         dist,
-    //         type
-    //     });
-    // }
+    const surfEdgesView = new DataView(buffer, lumpData["LUMP_SURFEDGES"].offset, lumpData["LUMP_SURFEDGES"].lumpLength);
+    const surfEdges = [];
+    for (let offset = 0; offset < planeView.byteLength; offset += 4) {
+        const surfEdge = surfEdgesView.getInt32(offset, true);
+        surfEdges.push(surfEdge);
+    }
+
+
+    const facesView = new DataView(buffer, lumpData["LUMP_FACES"].offset, lumpData["LUMP_FACES"].lumpLength);
+    const faces = [];
+    for (let offset = 0; offset < facesView.byteLength; offset += 20) {
+        const plane = facesView.getUint16(offset, true);
+        const side = facesView.getUint16(offset + 2, true);
+        const firstEdge = facesView.getUint32(offset + 4, true);
+        const edges = facesView.getUint16(offset + 8, true);
+        const textureInfo = facesView.getUint16(offset + 10);
+        const styles = facesView.getUint32(offset + 12);
+        const lightmapOffset = facesView.getUint32(offset + 16, true);
+        faces.push({
+            plane,
+            side,
+            firstEdge,
+            edges,
+            styles,
+            textureInfo,
+            lightmapOffset
+        });
+    }
 
     const bsp: BSP = {
         vertices,
         edges,
         planes,
+        faces,
+        surfEdges
     };
 
     return bsp;
