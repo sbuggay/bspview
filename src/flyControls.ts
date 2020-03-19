@@ -8,8 +8,8 @@ const Vector3 = THREE.Vector3;
 const Quaternion = THREE.Quaternion;
 
 export class FlyControls {
-    object: any;
-    domElement: any;
+    camera: THREE.Camera;
+    domElement: HTMLCanvasElement;
     movementSpeed: number;
     rollSpeed: number;
     dragToLook: boolean;
@@ -32,10 +32,15 @@ export class FlyControls {
     lastX: number;
     lastY: number;
 
-    constructor(object: any, domElement: any) {
-        this.object = object;
+    moving: boolean;
+
+    constructor(camera: THREE.Camera, domElement: HTMLCanvasElement) {
+        this.camera = camera;
         this.domElement = domElement;
-        if (domElement) this.domElement.setAttribute('tabindex', - 1);
+        if (domElement) this.domElement.setAttribute('tabindex', "-1    ");
+
+        this.lastX = 0;
+        this.lastY = 0;
 
         // API
 
@@ -60,7 +65,6 @@ export class FlyControls {
 
         this._mousemove = this.bind(this, this.mousemove);
         this._mousedown = this.bind(this, this.mousedown);
-        this._mouseup = this.bind(this, this.mouseup);
         this._keydown = this.bind(this, this.keydown);
         this._keyup = this.bind(this, this.keyup);
 
@@ -74,6 +78,8 @@ export class FlyControls {
 
         this.updateMovementVector();
         this.updateRotationVector();
+
+        this.moving = false;
     }
 
     keydown(event: any) {
@@ -148,138 +154,70 @@ export class FlyControls {
 
     mousedown(event: any) {
 
-        if (this.domElement !== document) {
+        this.domElement.requestPointerLock();
 
-            this.domElement.focus();
-
-        }
+        this.moving = true;
 
         event.preventDefault();
         event.stopPropagation();
-
-        if (this.dragToLook) {
-
-            this.mouseStatus++;
-
-        } else {
-
-            switch (event.button) {
-
-                case 0: this.moveState.forward = 1; break;
-                case 2: this.moveState.back = 1; break;
-
-            }
-
-            this.updateMovementVector();
-
-        }
 
     };
 
     mousemove(event: any) {
 
-        if (!this.dragToLook || this.mouseStatus > 0) {
+        if (this.moving) {
 
-            var container = this.getContainerDimensions();
-            var halfWidth = container.size[0] / 2;
-            var halfHeight = container.size[1] / 2;
+            var xAxis = new THREE.Vector3(1 ,0 ,0);
+            var yAxis = new THREE.Vector3(0 ,1 ,0);
 
-            console.log(event);
+            this.camera.rotateOnAxis(xAxis, event.movementY * -0.005);
+            this.camera.rotateOnWorldAxis(yAxis, event.movementX * -0.005);
 
-            this.moveState.yawLeft = - ((event.pageX - container.offset[0]) - halfWidth) / halfWidth;
-            this.moveState.pitchDown = ((event.pageY - container.offset[1]) - halfHeight) / halfHeight;
 
             this.updateRotationVector();
-
         }
 
     };
 
-    mouseup = function (event: any) {
-
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (this.dragToLook) {
-
-            this.mouseStatus--;
-
-            this.moveState.yawLeft = this.moveState.pitchDown = 0;
-
-        } else {
-
-            switch (event.button) {
-
-                case 0: this.moveState.forward = 0; break;
-                case 2: this.moveState.back = 0; break;
-
-            }
-
-            this.updateMovementVector();
-
-        }
-
-        this.updateRotationVector();
-
-    };
 
     update(delta: any) {
 
         var moveMult = delta * this.movementSpeed;
         var rotMult = delta * this.rollSpeed;
 
-        this.object.translateX(this.moveVector.x * moveMult);
-        this.object.translateY(this.moveVector.y * moveMult);
-        this.object.translateZ(this.moveVector.z * moveMult);
+        this.camera.translateX(this.moveVector.x * moveMult);
+        this.camera.translateY(this.moveVector.y * moveMult);
+        this.camera.translateZ(this.moveVector.z * moveMult);
 
         this.tmpQuaternion.set(this.rotationVector.x * rotMult, this.rotationVector.y * rotMult, this.rotationVector.z * rotMult, 1).normalize();
-        this.object.quaternion.multiply(this.tmpQuaternion);
+        this.camera.quaternion.multiply(this.tmpQuaternion);
 
         // expose the rotation vector for convenience
-        this.object.rotation.setFromQuaternion(this.object.quaternion, this.object.rotation.order);
+        this.camera.rotation.setFromQuaternion(this.camera.quaternion, this.camera.rotation.order);
 
 
     };
 
     updateMovementVector() {
-
         var forward = (this.moveState.forward || (this.autoForward && !this.moveState.back)) ? 1 : 0;
 
         this.moveVector.x = (- this.moveState.left + this.moveState.right);
         this.moveVector.y = (- this.moveState.down + this.moveState.up);
         this.moveVector.z = (- forward + this.moveState.back);
-
-        //console.log( 'move:', [ this.moveVector.x, this.moveVector.y, this.moveVector.z ] );
-
     };
 
     updateRotationVector() {
-
         this.rotationVector.x = (- this.moveState.pitchDown + this.moveState.pitchUp);
         this.rotationVector.y = (- this.moveState.yawRight + this.moveState.yawLeft);
         this.rotationVector.z = (- this.moveState.rollRight + this.moveState.rollLeft);
-
-        //console.log( 'rotate:', [ this.rotationVector.x, this.rotationVector.y, this.rotationVector.z ] );
-
     };
 
     getContainerDimensions() {
 
-        if (this.domElement != document) {
-
-            return {
-                size: [this.domElement.offsetWidth, this.domElement.offsetHeight],
-                offset: [this.domElement.offsetLeft, this.domElement.offsetTop]
-            };
-
-        } else {
-
-            return {
-                size: [window.innerWidth, window.innerHeight],
-                offset: [0, 0]
-            };
-
-        }
+        return {
+            size: [window.innerWidth, window.innerHeight],
+            offset: [0, 0]
+        };
 
     };
 
@@ -304,7 +242,6 @@ export class FlyControls {
         this.domElement.removeEventListener('contextmenu', this.contextmenu, false);
         this.domElement.removeEventListener('mousedown', this._mousedown, false);
         this.domElement.removeEventListener('mousemove', this._mousemove, false);
-        this.domElement.removeEventListener('mouseup', this._mouseup, false);
 
         window.removeEventListener('keydown', this._keydown, false);
         window.removeEventListener('keyup', this._keyup, false);

@@ -49,6 +49,7 @@ interface Vector3D {
 interface BSP {
     vertices: Vector3D[];
     edges: number[][];
+    planes: any[];
 }
 
 export function parseBSP(buffer: ArrayBuffer): BSP {
@@ -86,9 +87,44 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         edges.push([a, b]);
     }
 
+    const planeView = new DataView(buffer, lumpData["LUMP_PLANES"].offset, lumpData["LUMP_EDGES"].lumpLength);
+    const planes = [];
+    for (let offset = 0; offset < planeView.byteLength; offset += 20) {
+        const x = planeView.getFloat32(offset, true);
+        const y = planeView.getFloat32(offset + 4, true);
+        const z = planeView.getFloat32(offset + 8, true);
+        const dist = planeView.getFloat32(offset + 12, true);
+        const type = planeView.getUint32(offset + 16, true);
+        planes.push({
+            x,
+            y,
+            z,
+            dist,
+            type
+        });
+    }
+
+    // const facesView = new DataView(buffer, lumpData["LUMP_FACES"].offset, lumpData["LUMP_FACES"].lumpLength);
+    // const faces = [];
+    // for (let offset = 0; offset < planeView.byteLength; offset += 20) {
+    //     const x = planeView.getFloat32(offset, true);
+    //     const y = planeView.getFloat32(offset + 4, true);
+    //     const z = planeView.getFloat32(offset + 8, true);
+    //     const dist = planeView.getFloat32(offset + 12, true);
+    //     const type = planeView.getUint32(offset + 16, true);
+    //     planes.push({
+    //         x,
+    //         y,
+    //         z,
+    //         dist,
+    //         type
+    //     });
+    // }
+
     const bsp: BSP = {
         vertices,
-        edges
+        edges,
+        planes,
     };
 
     return bsp;

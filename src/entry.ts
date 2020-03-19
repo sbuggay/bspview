@@ -7,7 +7,7 @@ import { FlyControls } from "./flyControls";
 
 
 var scene = new THREE.Scene();
-var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
+var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 var renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -26,7 +26,7 @@ fetch("/bsp/c1a0.bsp").then(async (response) => {
             new THREE.Vector3(v1.x, v1.z, v1.y),
             new THREE.Vector3(v2.x, v2.z, v2.y),
         );
-        var material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        var material = new THREE.MeshBasicMaterial({ color: 0xffffff });
         var seg = new THREE.LineSegments(geometry, material);
         scene.add(seg);
     });
