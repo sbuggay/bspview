@@ -106,7 +106,7 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
     const planes = extract(planeView, ["Float32", "Float32", "Float32", "Float32", "Uint32"]);
 
     const surfEdgesView = new DataView(buffer, lumpData["LUMP_SURFEDGES"].offset, lumpData["LUMP_SURFEDGES"].lumpLength);
-    const surfEdges = extract(surfEdgesView, ["Uint32"]);
+    const surfEdges = extract(surfEdgesView, ["Int32"]);
 
     const facesView = new DataView(buffer, lumpData["LUMP_FACES"].offset, lumpData["LUMP_FACES"].lumpLength);
     const faces = extract(facesView, ["Uint16", "Uint16", "Uint32", "Uint16", "Uint16", "Uint32", "Uint32"]).map(data => {

@@ -21,9 +21,6 @@ fetch("/bsp/c1a0.bsp").then(async (response) => {
     const buffer = await response.arrayBuffer();
     const bsp = parseBSP(buffer);
 
-    console.log(bsp.surfEdges);
-    console.log(bsp.faces);
-
 
     bsp.faces.forEach(face => {
 
@@ -55,10 +52,8 @@ fetch("/bsp/c1a0.bsp").then(async (response) => {
             geometry.faces.push(new THREE.Face3(triangles[i][0], triangles[i][1], triangles[i][2]));
         }
 
-        
-
-
-        const mesh = new THREE.Mesh( geometry, material );
+    
+        const mesh = new THREE.LineSegments( geometry, material );
 
         scene.add(mesh);
     });

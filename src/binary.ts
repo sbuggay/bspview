@@ -2,6 +2,7 @@
 interface TypeMapping {
     Float32: [number, (dataView: DataView, o: number) => number];
     Uint32: [number, (dataView: DataView, o: number) => number];
+    Int32: [number, (dataView: DataView, o: number) => number];
     Uint16: [number, (dataView: DataView, o: number) => number];
     Uint8: [number, (dataView: DataView, o: number) => number];
 }
@@ -9,6 +10,7 @@ interface TypeMapping {
 export const typeMapping: TypeMapping = {
     Float32: [4, (dataView, o) => dataView.getFloat32(o, true)],
     Uint32: [4, (dataView, o) => dataView.getUint32(o, true)],
+    Int32: [4, (dataView, o) => dataView.getInt32(o, true)],
     Uint16: [2, (dataView, o) => dataView.getUint16(o, true)],
     Uint8: [1, (dataView, o) => dataView.getUint8(o)]
 }
