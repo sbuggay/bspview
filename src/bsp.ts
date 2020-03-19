@@ -83,71 +83,35 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
 
     // Parse vertices
     const vertexView = new DataView(buffer, lumpData["LUMP_VERTICES"].offset, lumpData["LUMP_VERTICES"].lumpLength);
-    const vertices = [];
-    for (let offset = 0; offset < vertexView.byteLength; offset += 12) {
-        const x = vertexView.getFloat32(offset, true);
-        const y = vertexView.getFloat32(offset + 4, true);
-        const z = vertexView.getFloat32(offset + 8, true);
-        vertices.push({
-            x, y, z
-        });
-    }
-
+    const vertices = extract(vertexView, ["Float32", "Float32", "Float32"]).map(vertex => {
+        return {
+            x: vertex[0],
+            y: vertex[1],
+            z: vertex[2]
+        }
+    });
 
     const edgeView = new DataView(buffer, lumpData["LUMP_EDGES"].offset, lumpData["LUMP_EDGES"].lumpLength);
     const edges = extract(edgeView, ["Uint16", "Uint16"]);
-    // const edges = [];
-    // for (let offset = 0; offset < edgeView.byteLength; offset += 4) {
-    //     const a = edgeView.getUint16(offset, true);
-    //     const b = edgeView.getUint16(offset + 2, true);
-    //     edges.push([a, b]);
-    // }
 
-    const planeView = new DataView(buffer, lumpData["LUMP_PLANES"].offset, lumpData["LUMP_EDGES"].lumpLength);
-    const planes = [];
-    for (let offset = 0; offset < planeView.byteLength; offset += 20) {
-        const x = planeView.getFloat32(offset, true);
-        const y = planeView.getFloat32(offset + 4, true);
-        const z = planeView.getFloat32(offset + 8, true);
-        const dist = planeView.getFloat32(offset + 12, true);
-        const type = planeView.getUint32(offset + 16, true);
-        planes.push({
-            x,
-            y,
-            z,
-            dist,
-            type
-        });
-    }
+    const planeView = new DataView(buffer, lumpData["LUMP_PLANES"].offset, lumpData["LUMP_PLANES"].lumpLength);
+    const planes = extract(planeView, ["Float32", "Float32", "Float32", "Float32", "Uint32"]);
 
     const surfEdgesView = new DataView(buffer, lumpData["LUMP_SURFEDGES"].offset, lumpData["LUMP_SURFEDGES"].lumpLength);
-    const surfEdges = [];
-    for (let offset = 0; offset < planeView.byteLength; offset += 4) {
-        const surfEdge = surfEdgesView.getInt32(offset, true);
-        surfEdges.push(surfEdge);
-    }
-
+    const surfEdges = extract(surfEdgesView, ["Uint32"]);
 
     const facesView = new DataView(buffer, lumpData["LUMP_FACES"].offset, lumpData["LUMP_FACES"].lumpLength);
-    const faces = [];
-    for (let offset = 0; offset < facesView.byteLength; offset += 20) {
-        const plane = facesView.getUint16(offset, true);
-        const side = facesView.getUint16(offset + 2, true);
-        const firstEdge = facesView.getUint32(offset + 4, true);
-        const edges = facesView.getUint16(offset + 8, true);
-        const textureInfo = facesView.getUint16(offset + 10);
-        const styles = facesView.getUint32(offset + 12);
-        const lightmapOffset = facesView.getUint32(offset + 16, true);
-        faces.push({
-            plane,
-            side,
-            firstEdge,
-            edges,
-            styles,
-            textureInfo,
-            lightmapOffset
-        });
-    }
+    const faces = extract(facesView, ["Uint16", "Uint16", "Uint32", "Uint16", "Uint16", "Uint32", "Uint32"]).map(data => {
+        return {
+            plane: data[0],
+            side: data[1],
+            firstEdge: data[2],
+            edges: data[3],
+            textureInfo: data[4],
+            styles: data[5],
+            lightmapOffset: data[6]
+        }
+    });
 
     const bsp: BSP = {
         vertices,
