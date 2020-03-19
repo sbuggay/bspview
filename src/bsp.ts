@@ -56,10 +56,18 @@ interface Face {
     lightmapOffset: number;
 }
 
+interface Plane {
+    x: number;
+    y: number;
+    z: number;
+    dist: number;
+    type: number;
+}
+
 interface BSP {
     vertices: Vector3D[];
     edges: number[][];
-    planes: any[];
+    planes: Plane[];
     faces: Face[];
     surfEdges: number[];
 }
@@ -99,7 +107,7 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         edges.push([a, b]);
     }
 
-    const planeView = new DataView(buffer, lumpData["LUMP_PLANES"].offset, lumpData["LUMP_EDGES"].lumpLength);
+    const planeView = new DataView(buffer, lumpData["LUMP_PLANES"].offset, lumpData["LUMP_PLANES"].lumpLength);
     const planes = [];
     for (let offset = 0; offset < planeView.byteLength; offset += 20) {
         const x = planeView.getFloat32(offset, true);
@@ -118,7 +126,7 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
 
     const surfEdgesView = new DataView(buffer, lumpData["LUMP_SURFEDGES"].offset, lumpData["LUMP_SURFEDGES"].lumpLength);
     const surfEdges = [];
-    for (let offset = 0; offset < planeView.byteLength; offset += 4) {
+    for (let offset = 0; offset < surfEdgesView.byteLength; offset += 4) {
         const surfEdge = surfEdgesView.getInt32(offset, true);
         surfEdges.push(surfEdge);
     }
