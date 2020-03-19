@@ -1,0 +1,26 @@
+{
+  "name": "bspview",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "stats.js": "^0.17.0",
+    "three": "^0.114.0"
+  },
+  "devDependencies": {
+    "@types/stats.js": "^0.17.0",
+    "@types/three": "^0.103.2",
+    "ts-loader": "^6.2.1",
+    "typescript": "^3.7.5",
+    "webpack": "^4.41.5",
+    "webpack-cli": "^3.3.10",
+    "webpack-dev-server": "^3.10.3"
+  },
+  "scripts": {
+    "build": "webpack",
+    "start": "webpack-dev-server --open",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
