@@ -23,7 +23,9 @@ function loadMap(map: string) {
 
     const url = `https://github.com/sbuggay/bspview/raw/master/docs/bsp/${map}`;
 
-    fetch(url).then(async (response) => {
+    fetch(url, {
+        mode: "no-cors"
+    }).then(async (response) => {
         const buffer = await response.arrayBuffer();
         const bsp = parseBSP(buffer);
         var geometry = new THREE.Geometry();
@@ -65,9 +67,9 @@ function loadMap(map: string) {
             // }
 
             // material.side = THREE.DoubleSide;
-            
+
         });
-        
+
         const material = new THREE.MeshBasicMaterial({ color: 0x1155aa });
         const mesh = new THREE.LineSegments(geometry, material);
         scene.add(mesh);
