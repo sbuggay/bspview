@@ -66,7 +66,8 @@ interface Plane {
     type: number;
 }
 
-interface BSP {
+export interface BSP {
+    id: number;
     vertices: Vector3D[];
     edges: number[][];
     planes: Plane[];
@@ -76,7 +77,8 @@ interface BSP {
 
 export function parseBSP(buffer: ArrayBuffer): BSP {
     const view = new DataView(buffer);
-    console.log(view.getUint32(0, true));
+
+    const id = view.getUint32(0, true);
 
     const lumpData: { [key: string]: any } = {};
 
@@ -108,6 +110,8 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
     const surfEdgesView = new DataView(buffer, lumpData["LUMP_SURFEDGES"].offset, lumpData["LUMP_SURFEDGES"].lumpLength);
     const surfEdges = extract(surfEdgesView, ["Int32"]);
 
+    const entityView = new DataView(buffer)
+
     const facesView = new DataView(buffer, lumpData["LUMP_FACES"].offset, lumpData["LUMP_FACES"].lumpLength);
     const faces = extract(facesView, ["Uint16", "Uint16", "Uint32", "Uint16", "Uint16", "Uint32", "Uint32"]).map(data => {
         return {
@@ -122,6 +126,7 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
     });
 
     const bsp: BSP = {
+        id,
         vertices,
         edges,
         planes,

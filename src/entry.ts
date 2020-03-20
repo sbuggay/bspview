@@ -5,12 +5,18 @@ import * as Stats from "stats.js";
 import { FlyControls } from "./FlyControls";
 import { MapSelector, maps } from "./MapSelector";
 
+
+
 const clock = new THREE.Clock();
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
+
+window.onresize = () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
 
 new MapSelector(document.body, (event) => {
     const value = (event.target as HTMLSelectElement).value;
@@ -28,10 +34,9 @@ function loadMap(map: string) {
         const bsp = parseBSP(buffer);
         var geometry = new THREE.Geometry();
 
-        bsp.faces.forEach((face, fIndex) => {
+        bsp.faces.forEach((face) => {
 
             let firstEdgeIndex = face.firstEdge;
-
 
             for (let i = 0; i < face.edges; i++) {
 
@@ -68,7 +73,7 @@ function loadMap(map: string) {
 
         });
 
-        const material = new THREE.MeshBasicMaterial({ color: 0x1155aa });
+        const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
         const mesh = new THREE.LineSegments(geometry, material);
         scene.add(mesh);
 
