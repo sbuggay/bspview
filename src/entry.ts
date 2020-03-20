@@ -12,7 +12,7 @@ const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-const mapSelector = new MapSelector(document.body, (event) => {
+new MapSelector(document.body, (event) => {
     const value = (event.target as HTMLSelectElement).value;
     loadMap(value);
 });
@@ -21,7 +21,9 @@ function loadMap(map: string) {
 
     let scene = new THREE.Scene();
 
-    fetch(`/bsp/${map}`).then(async (response) => {
+    const url = `https://github.com/sbuggay/bspview/raw/master/docs/bsp/${map}`;
+
+    fetch(url).then(async (response) => {
         const buffer = await response.arrayBuffer();
         const bsp = parseBSP(buffer);
         var geometry = new THREE.Geometry();
