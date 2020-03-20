@@ -21,11 +21,9 @@ function loadMap(map: string) {
 
     let scene = new THREE.Scene();
 
-    const url = `https://github.com/sbuggay/bspview/raw/master/docs/bsp/${map}`;
+    const url = `https://devanbuggay.com/bspview/bsp/${map}`;
 
-    fetch(url, {
-        mode: "no-cors"
-    }).then(async (response) => {
+    fetch(url).then(async (response) => {
         const buffer = await response.arrayBuffer();
         const bsp = parseBSP(buffer);
         var geometry = new THREE.Geometry();
