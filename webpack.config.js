@@ -16,10 +16,10 @@ module.exports = {
     },
 
     devServer: {
-        contentBase: './public',
+        contentBase: './docs',
     },
     output: {
         filename: 'bundle.js',
-        path: path.resolve(__dirname, 'public'),
+        path: path.resolve(__dirname, 'docs'),
     },
 };

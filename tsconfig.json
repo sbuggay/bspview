@@ -7,7 +7,7 @@
         "noImplicitAny": true,
         "removeComments": true,
         "preserveConstEnums": true,
-        "outDir": "dist/",
+        "outDir": "docs/",
         "sourceMap": true
     },
     "include": [
