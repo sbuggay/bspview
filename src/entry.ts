@@ -15,6 +15,8 @@ const bottomElement = document.getElementById("bottom");
 const clock = new THREE.Clock();
 const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 3000);
 const renderer = new THREE.WebGLRenderer();
+const controls = new FlyControls(camera, renderer.domElement);
+
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 viewElement.appendChild(renderer.domElement);
@@ -23,7 +25,7 @@ window.onresize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-const controls = new Controls(topElement, (event) => {
+const controlElement = new Controls(topElement, (event) => {
     const value = (event.target as HTMLSelectElement).value;
     const url = `https://devanbuggay.com/bspview/bsp/${value}`;
     loadMapFromUrl(url);
@@ -70,12 +72,14 @@ async function loadMapFromUrl(url: string) {
 
 function loadMap(buffer: ArrayBuffer) {
 
+    if (controls.controlsFocused) {
+        console.warn("Map loaded while controls were focused");
+        return;
+    }
+
     let scene = new THREE.Scene();
-
     const bsp = parseBSP(buffer);
-
     bspInfo.update(bsp);
-
     var geometry = new THREE.Geometry();
 
     bsp.faces.forEach((face) => {
@@ -142,8 +146,6 @@ function loadMap(buffer: ArrayBuffer) {
     var stats = new Stats();
     stats.showPanel(0);
     document.body.appendChild(stats.dom);
-
-    const controls = new FlyControls(camera, renderer.domElement);
 
     controls.movementSpeed = 500;
     controls.domElement = renderer.domElement;

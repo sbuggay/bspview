@@ -40,7 +40,7 @@ export class BspInfo {
 
     update(bsp: BSP) {
         this.element.innerHTML = "";
-        this.addText(`${idMapping[bsp.header.id]} (BSP   id: ${bsp.header.id.toString()})`);
+        this.addText(`${idMapping[bsp.header.id]} (BSP id: ${bsp.header.id.toString()})`);
 
         this.addRow("Entities: ", bsp.entities.length.toString());
         this.addRow("Vertices: ", bsp.vertices.length.toString());
@@ -50,5 +50,4 @@ export class BspInfo {
         this.addRow("Planes: ", bsp.planes.length.toString());
 
     }
-
 }

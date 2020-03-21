@@ -40,14 +40,25 @@ export class Controls {
         this.detailsElement = detailsElement;
         element.appendChild(this.detailsElement);
 
-
-
         // Build controls
 
-        this.addText("Click anywhere to lock pointer");
+        this.addText("Click anywhere to lock the pointer");
         this.addText("WASD to move");
         this.addText("F to toggle fullscreen");
+        this.addText("Use the dropdown to change maps");
         this.addText("Drag and drop a .bsp to load it")
+
+
+        const github = document.createElement("a");
+        github.href = "https://github.com/sbuggay/bspview";
+        github.innerText = "https://github.com/sbuggay/bspview";
+        
+        const githubDiv = document.createElement("div");
+        githubDiv.appendChild(github);
+        githubDiv.style.paddingTop = "20px";
+
+        this.detailsElement.appendChild(githubDiv);
+        
     }
 
     addText(data: string) {

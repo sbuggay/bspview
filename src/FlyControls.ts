@@ -30,7 +30,7 @@ export class FlyControls {
     lastX: number;
     lastY: number;
 
-    moving: boolean;
+    public controlsFocused: boolean;
 
     constructor(camera: THREE.Camera, domElement: HTMLCanvasElement) {
         this.camera = camera;
@@ -70,10 +70,10 @@ export class FlyControls {
 
         function lockChangeAlert() {
             if (document.pointerLockElement === this.domElement) {
-                this.moving = true;
+                this.controlsFocused = true;
             }
             else {
-                this.moving = false;
+                this.controlsFocused = false;
             }
         }
 
@@ -82,7 +82,7 @@ export class FlyControls {
 
         this.updateMovementVector();
 
-        this.moving = false;
+        this.controlsFocused = false;
     }
 
     keydown(event: any) {
@@ -102,6 +102,9 @@ export class FlyControls {
 
         this.updateMovementVector();
 
+        event.preventDefault();
+
+
     };
 
     keyup(event: any) {
@@ -115,6 +118,8 @@ export class FlyControls {
         }
 
         this.updateMovementVector();
+
+        event.preventDefault();
     };
 
     mousedown(event: any) {
@@ -124,7 +129,7 @@ export class FlyControls {
     };
 
     mousemove(event: any) {
-        if (this.moving) {
+        if (this.controlsFocused) {
             var xAxis = new THREE.Vector3(1, 0, 0);
             var yAxis = new THREE.Vector3(0, 1, 0);
             this.camera.rotateOnAxis(xAxis, event.movementY * -0.002);
