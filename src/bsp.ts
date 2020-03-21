@@ -1,5 +1,5 @@
 
-import { extract, typeMapping } from "./binary";
+import { extract, TypeMapping } from "./binary";
 
 // #define LUMP_ENTITIES      0
 // #define LUMP_PLANES        1
@@ -42,6 +42,17 @@ const lumps = [
     "HEADER_LUMPS"
 ]
 
+interface Header {
+    id: number;
+    lumps: { [key: string]: Lump };
+}
+
+export interface Lump {
+    name: string;
+    offset: number;
+    size: number;
+}
+
 interface Vector3D {
     x: number;
     y: number;
@@ -66,34 +77,87 @@ interface Plane {
     type: number;
 }
 
+interface Entity {
+    origin?: string;
+}
+
 export interface BSP {
-    id: number;
+    header: Header;
     vertices: Vector3D[];
     edges: number[][];
     planes: Plane[];
     faces: Face[];
     surfEdges: number[];
+    entities: Entity[];
 }
 
-export function parseBSP(buffer: ArrayBuffer): BSP {
-    const view = new DataView(buffer);
+function parseHeader(buffer: ArrayBuffer) {
 
+    const view = new DataView(buffer);
     const id = view.getUint32(0, true);
 
-    const lumpData: { [key: string]: any } = {};
+
+    const lumpData: { [key: string]: Lump } = {}
 
     for (let i = 0; i < lumps.length; i++) {
         let lumpType = lumps[i];
         const offset = view.getUint32((i * 8) + 4, true);
-        const lumpLength = view.getUint32((i * 8) + 8, true);
-        lumpData[lumpType] = { offset, lumpLength };
+        const size = view.getUint32((i * 8) + 8, true);
+        lumpData[lumpType] = { name: lumpType, offset, size };
     }
 
-    console.table(lumpData);
+    return {
+        id,
+        lumps: lumpData
+    };
+}
 
-    // Parse vertices
-    const vertexView = new DataView(buffer, lumpData["LUMP_VERTICES"].offset, lumpData["LUMP_VERTICES"].lumpLength);
-    const vertices = extract(vertexView, ["Float32", "Float32", "Float32"]).map(vertex => {
+function extractLump(buffer: ArrayBuffer, lump: Lump, types: (keyof TypeMapping)[]) {
+    return extract(new DataView(buffer, lump.offset, lump.size), types);
+}
+
+function parseEntities(entityString: string) {
+    
+
+    const split = entityString.split("\n");
+
+
+    const entities: any[] = [];
+    let tempObject: {[key: string]: string} = {};
+
+    split.forEach(line => {
+        if (line === "{") {
+            // new temp object
+            tempObject = {};
+        }
+        else if (line === "}") {``
+            // push to entities
+            entities.push(tempObject);
+        }
+        else {
+            const data = line.replace(/\"/g, "").split(" ");
+            tempObject[data[0]] = data.slice(1).join(" ");
+        }
+    });
+
+    return entities;
+
+}
+
+export function parseBSP(buffer: ArrayBuffer): BSP {
+
+
+    const header = parseHeader(buffer);
+    const lumps = header.lumps;
+
+    console.table(lumps);
+
+    // Entities is a special case
+    const entityLump = lumps["LUMP_ENTITIES"];
+    const entityString = Buffer.from(buffer.slice(entityLump.offset, entityLump.offset + entityLump.size)).toString("ascii");
+    const entities = parseEntities(entityString);
+
+    const vertices = extractLump(buffer, lumps["LUMP_VERTICES"], ["Float32", "Float32", "Float32"]).map(vertex => {
         return {
             x: vertex[0],
             y: vertex[1],
@@ -101,19 +165,11 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         }
     });
 
-    const edgeView = new DataView(buffer, lumpData["LUMP_EDGES"].offset, lumpData["LUMP_EDGES"].lumpLength);
-    const edges = extract(edgeView, ["Uint16", "Uint16"]);
+    const edges = extractLump(buffer, lumps["LUMP_EDGES"], ["Uint16", "Uint16"]);
+    const planes = extractLump(buffer, lumps["LUMP_PLANES"], ["Float32", "Float32", "Float32", "Float32", "Uint32"]);
+    const surfEdges = extractLump(buffer, lumps["LUMP_SURFEDGES"], ["Int32"]);
 
-    const planeView = new DataView(buffer, lumpData["LUMP_PLANES"].offset, lumpData["LUMP_PLANES"].lumpLength);
-    const planes = extract(planeView, ["Float32", "Float32", "Float32", "Float32", "Uint32"]);
-
-    const surfEdgesView = new DataView(buffer, lumpData["LUMP_SURFEDGES"].offset, lumpData["LUMP_SURFEDGES"].lumpLength);
-    const surfEdges = extract(surfEdgesView, ["Int32"]);
-
-    const entityView = new DataView(buffer)
-
-    const facesView = new DataView(buffer, lumpData["LUMP_FACES"].offset, lumpData["LUMP_FACES"].lumpLength);
-    const faces = extract(facesView, ["Uint16", "Uint16", "Uint32", "Uint16", "Uint16", "Uint32", "Uint32"]).map(data => {
+    const faces = extractLump(buffer, lumps["LUMP_FACES"], ["Uint16", "Uint16", "Uint32", "Uint16", "Uint16", "Uint32", "Uint32"]).map(data => {
         return {
             plane: data[0],
             side: data[1],
@@ -126,10 +182,11 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
     });
 
     const bsp: BSP = {
-        id,
+        header,
         vertices,
         edges,
         planes,
+        entities,
         faces,
         surfEdges
     };

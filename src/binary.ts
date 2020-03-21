@@ -1,5 +1,5 @@
 
-interface TypeMapping {
+export interface TypeMapping {
     Float32: [number, (dataView: DataView, o: number) => number];
     Uint32: [number, (dataView: DataView, o: number) => number];
     Int32: [number, (dataView: DataView, o: number) => number];
