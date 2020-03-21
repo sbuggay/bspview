@@ -3,23 +3,33 @@ import * as THREE from "three";
 
 import * as Stats from "stats.js";
 import { FlyControls } from "./FlyControls";
-import { MapSelector, maps } from "./MapSelector";
+import { Controls, maps } from "./Controls";
+import { BspInfo } from "./BspInfo";
+import { mergeBufferGeometries } from "./utils";
+
+const viewElement = document.body;
+const dashboardElement = document.getElementById("dashboard");
+const topElement = document.getElementById("top");
+const bottomElement = document.getElementById("bottom");
 
 const clock = new THREE.Clock();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 3000);
+const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 3000);
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+
+viewElement.appendChild(renderer.domElement);
 
 window.onresize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-const mapSelector = new MapSelector(document.body, (event) => {
+const controls = new Controls(topElement, (event) => {
     const value = (event.target as HTMLSelectElement).value;
     const url = `https://devanbuggay.com/bspview/bsp/${value}`;
     loadMapFromUrl(url);
 });
+
+const bspInfo = new BspInfo(bottomElement);
 
 function registerDragEvents() {
     ["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
@@ -63,6 +73,9 @@ function loadMap(buffer: ArrayBuffer) {
     let scene = new THREE.Scene();
 
     const bsp = parseBSP(buffer);
+
+    bspInfo.update(bsp);
+
     var geometry = new THREE.Geometry();
 
     bsp.faces.forEach((face) => {
@@ -96,10 +109,35 @@ function loadMap(buffer: ArrayBuffer) {
 
     });
 
-    const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const material = new THREE.MeshBasicMaterial({ color: 0x0055aa });
     const mesh = new THREE.LineSegments(geometry, material);
     scene.add(mesh);
 
+    // const entityMaterial = new THREE.MeshBasicMaterial({ color: 0x00aa11, wireframe: true });
+
+    var geo = new THREE.BufferGeometry().fromGeometry(new THREE.BoxGeometry(10, 10, 10))
+
+    const entityGeos: any[] = [];
+
+    bsp.entities.forEach(entity => {
+        if (!entity.origin) return;
+        const split = entity.origin.split(" ");
+        const x = parseFloat(split[0]);
+        const y = parseFloat(split[1]);
+        const z = parseFloat(split[2]);
+
+        var geometry = geo.clone()
+        geometry.applyMatrix4(new THREE.Matrix4().makeTranslation(y, z, x));
+        // then, we push this bufferGeometry instance in our array
+        entityGeos.push(geometry)
+    });
+    
+    // Here is the big boy in action
+    var geometriesCubes = mergeBufferGeometries(entityGeos, false);
+    
+    // now we got 1 mega big mesh with 10 000 cubes in it
+    var entityMesh = new THREE.Mesh(geometriesCubes, new THREE.MeshNormalMaterial());
+    scene.add(entityMesh);
 
     var stats = new Stats();
     stats.showPanel(0);

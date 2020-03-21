@@ -8,7 +8,8 @@ export const maps = [
     "de_dust.bsp",
     "de_dust2.bsp",
     "de_inferno.bsp",
-    "de_cbble.bsp"
+    "de_cbble.bsp",
+    "quake_start.bsp"
 ];
 
 export class Controls {

@@ -1,6 +1,7 @@
 import { BSP, Lump } from "./bsp";
 
 const idMapping: { [key: number]: string } = {
+    29: "Quake",
     30: "Half-Life"
 }
 

@@ -1,44 +1,22 @@
 
 import { extract, TypeMapping } from "./binary";
 
-// #define LUMP_ENTITIES      0
-// #define LUMP_PLANES        1
-// #define LUMP_TEXTURES      2
-// #define LUMP_VERTICES      3
-// #define LUMP_VISIBILITY    4
-// #define LUMP_NODES         5
-// #define LUMP_TEXINFO       6
-// #define LUMP_FACES         7
-// #define LUMP_LIGHTING      8
-// #define LUMP_CLIPNODES     9
-// #define LUMP_LEAVES       10
-// #define LUMP_MARKSURFACES 11
-// #define LUMP_EDGES        12
-// #define LUMP_SURFEDGES    13
-// #define LUMP_MODELS       14
-// #define HEADER_LUMPS      15
-
-// typedef struct _VECTOR3D
-// {
-//     float x, y, z;
-// } VECTOR3D;
-
-const lumps = [
-    "LUMP_ENTITIES",
-    "LUMP_PLANES",
-    "LUMP_TEXTURES",
-    "LUMP_VERTICES",
-    "LUMP_VISIBILITY",
-    "LUMP_NODES",
-    "LUMP_TEXINFO",
-    "LUMP_FACES",
-    "LUMP_LIGHTING",
-    "LUMP_CLIPNODES",
-    "LUMP_LEAVES",
-    "LUMP_MARKSURFACES",
-    "LUMP_EDGES",
-    "LUMP_SURFEDGES",
-    "LUMP_MODELS",
+const HEADER30 = [
+    "ENTITIES",
+    "PLANES",
+    "TEXTURES",
+    "VERTICES",
+    "VISIBILITY",
+    "NODES",
+    "TEXINFO",
+    "FACES",
+    "LIGHTING",
+    "CLIPNODES",
+    "LEAVES",
+    "MARKSURFACES",
+    "EDGES",
+    "SURFEDGES",
+    "MODELS",
     "HEADER_LUMPS"
 ]
 
@@ -94,13 +72,12 @@ export interface BSP {
 function parseHeader(buffer: ArrayBuffer) {
 
     const view = new DataView(buffer);
-    const id = view.getUint32(0, true);
-
+    let id = view.getUint32(0, true);
 
     const lumpData: { [key: string]: Lump } = {}
 
-    for (let i = 0; i < lumps.length; i++) {
-        let lumpType = lumps[i];
+    for (let i = 0; i < HEADER30.length; i++) {
+        let lumpType = HEADER30[i];
         const offset = view.getUint32((i * 8) + 4, true);
         const size = view.getUint32((i * 8) + 8, true);
         lumpData[lumpType] = { name: lumpType, offset, size };
@@ -118,10 +95,7 @@ function extractLump(buffer: ArrayBuffer, lump: Lump, types: (keyof TypeMapping)
 
 function parseEntities(entityString: string) {
     
-
     const split = entityString.split("\n");
-
-
     const entities: any[] = [];
     let tempObject: {[key: string]: string} = {};
 
@@ -141,11 +115,9 @@ function parseEntities(entityString: string) {
     });
 
     return entities;
-
 }
 
 export function parseBSP(buffer: ArrayBuffer): BSP {
-
 
     const header = parseHeader(buffer);
     const lumps = header.lumps;
@@ -153,11 +125,11 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
     console.table(lumps);
 
     // Entities is a special case
-    const entityLump = lumps["LUMP_ENTITIES"];
+    const entityLump = lumps["ENTITIES"];
     const entityString = Buffer.from(buffer.slice(entityLump.offset, entityLump.offset + entityLump.size)).toString("ascii");
     const entities = parseEntities(entityString);
 
-    const vertices = extractLump(buffer, lumps["LUMP_VERTICES"], ["Float32", "Float32", "Float32"]).map(vertex => {
+    const vertices = extractLump(buffer, lumps["VERTICES"], ["Float32", "Float32", "Float32"]).map(vertex => {
         return {
             x: vertex[0],
             y: vertex[1],
@@ -165,11 +137,11 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         }
     });
 
-    const edges = extractLump(buffer, lumps["LUMP_EDGES"], ["Uint16", "Uint16"]);
-    const planes = extractLump(buffer, lumps["LUMP_PLANES"], ["Float32", "Float32", "Float32", "Float32", "Uint32"]);
-    const surfEdges = extractLump(buffer, lumps["LUMP_SURFEDGES"], ["Int32"]);
+    const edges = extractLump(buffer, lumps["EDGES"], ["Uint16", "Uint16"]);
+    const planes = extractLump(buffer, lumps["PLANES"], ["Float32", "Float32", "Float32", "Float32", "Uint32"]);
+    const surfEdges = extractLump(buffer, lumps["SURFEDGES"], ["Int32"]);
 
-    const faces = extractLump(buffer, lumps["LUMP_FACES"], ["Uint16", "Uint16", "Uint32", "Uint16", "Uint16", "Uint32", "Uint32"]).map(data => {
+    const faces = extractLump(buffer, lumps["FACES"], ["Uint16", "Uint16", "Uint32", "Uint16", "Uint16", "Uint32", "Uint32"]).map(data => {
         return {
             plane: data[0],
             side: data[1],

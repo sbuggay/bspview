@@ -1,3 +1,19 @@
+// https://stackoverflow.com/questions/53103695/how-to-read-64-bit-integer-from-an-arraybuffer-dataview-in-javascript
+
+// DataView.prototype.getUint64 = function (byteOffset: number, littleEndian: boolean) {
+//     // split 64-bit number into two 32-bit parts
+//     const left = this.getUint32(byteOffset, littleEndian);
+//     const right = this.getUint32(byteOffset + 4, littleEndian);
+
+//     // combine the two 32-bit values
+//     const combined = littleEndian ? left + 2 ** 32 * right : 2 ** 32 * left + right;
+
+//     if (!Number.isSafeInteger(combined))
+//         console.warn(combined, 'exceeds MAX_SAFE_INTEGER. Precision may be lost');
+
+//     return combined;
+// }
+
 
 export interface TypeMapping {
     Float32: [number, (dataView: DataView, o: number) => number];
@@ -5,6 +21,7 @@ export interface TypeMapping {
     Int32: [number, (dataView: DataView, o: number) => number];
     Uint16: [number, (dataView: DataView, o: number) => number];
     Uint8: [number, (dataView: DataView, o: number) => number];
+
 }
 
 export const typeMapping: TypeMapping = {
