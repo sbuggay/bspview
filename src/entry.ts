@@ -6,16 +6,23 @@ import { FlyControls } from "./FlyControls";
 import { Controls, maps } from "./Controls";
 import { BspInfo } from "./BspInfo";
 import { mergeBufferGeometries } from "./utils";
+import { Vector3, Face3 } from "three";
 
 const viewElement = document.body;
 const dashboardElement = document.getElementById("dashboard");
 const topElement = document.getElementById("top");
 const bottomElement = document.getElementById("bottom");
 
+var stats = new Stats();
+stats.showPanel(0);
+document.body.appendChild(stats.dom);
+
 const clock = new THREE.Clock();
-const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 3000);
+const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 10, 3000);
 const renderer = new THREE.WebGLRenderer();
 const controls = new FlyControls(camera, renderer.domElement);
+
+
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 
@@ -77,51 +84,96 @@ function loadMap(buffer: ArrayBuffer) {
         return;
     }
 
-    let scene = new THREE.Scene();
+    const scene = new THREE.Scene();
+
+    const color = 0xCCCCCC;
+    const intensity = 0.2;
+    const light = new THREE.AmbientLight(color, intensity);
+    scene.add(light);
+
+    const near = 10;
+    const far = 1000;
+    scene.fog = new THREE.Fog(0x00000, near, far);
+
+    // reset camera position
+    camera.position.set(0, 0, 0);
+
     const bsp = parseBSP(buffer);
     bspInfo.update(bsp);
-    var geometry = new THREE.Geometry();
 
-    bsp.faces.forEach((face) => {
+    // Triangulating BSP edges is very easy, edge reversal is already done before it reaches here.
+    function triangulate(vertices: Vector3[]): THREE.Face3[] {
+        vertices = vertices.reverse();
 
-        let firstEdgeIndex = face.firstEdge;
+        if (vertices.length < 3) {
+            return [];
+        }
+
+        const faces: THREE.Face3[] = [];
+        for (let i = 1; i < vertices.length - 1; i++) {
+            faces.push(new Face3(0, i, i + 1));
+        }
+        return faces;
+    }
+
+    // We are going to store each model's starting face here so not to render it as a normal face
+    const modelFaces: { [key: number]: number } = {};
+
+    bsp.models.forEach((model, index) => {
+        const depth = Math.abs(model.max[0] - model.min[0]);
+        const width = Math.abs(model.max[1] - model.min[1]);
+        const height = Math.abs(model.max[2] - model.min[2]);
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+
+        const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x00aa11, wireframe: true }));
+        mesh.position.set((model.max[1] + model.min[1]) / 2, (model.max[2] + model.min[2]) / 2, (model.max[0] + model.min[0]) / 2)
+        mesh.visible = false;
+        scene.add(mesh);
+
+        // Add to faceStarts
+        if (index === 0) return; // Dont add total face model (is this true for all maps?)
+        modelFaces[model.firstFace] = model.faces;
+    });
+
+    for (let faceIndex = 0; faceIndex < bsp.faces.length; faceIndex++) {
+
+        if (modelFaces[faceIndex] > 0) {
+            faceIndex += modelFaces[faceIndex] - 1;
+            continue
+        }
+
+        const geometry = new THREE.Geometry();
+
+        const face = bsp.faces[faceIndex];
 
         for (let i = 0; i < face.edges; i++) {
 
-            const surfEdge = bsp.surfEdges[firstEdgeIndex + i];
+            const surfEdge = bsp.surfEdges[face.firstEdge + i];
             const edge = bsp.edges[Math.abs(surfEdge)];
 
+            // We only need to care about the first vertex here, the second one will be duplicated in the next edge
             let v1 = bsp.vertices[edge[0]];
-            let v2 = bsp.vertices[edge[1]];
+
+            // Unless surfEdge is negative, meaning it's the wrong way around. Flip it.
+            if (surfEdge < 0) {
+                v1 = bsp.vertices[edge[1]];
+            }
 
             geometry.vertices.push(new THREE.Vector3(v1.y, v1.z, v1.x));
-            geometry.vertices.push(new THREE.Vector3(v2.y, v2.z, v2.x));
-
         }
 
-        // if (firstVertex) {
-        //     geometry.vertices.push(new THREE.Vector3(firstVertex.y, firstVertex.z, firstVertex.x));
-        // }
-
-        // const triangles = THREE.ShapeUtils.triangulateShape(geometry.vertices, []);
-
-        // for (var i = 0; i < triangles.length; i++) {
-        //     geometry.faces.push(new THREE.Face3(triangles[i][0], triangles[i][1], triangles[i][2]));
-        // }
-
-        // material.side = THREE.DoubleSide;
-
-    });
-
-    const material = new THREE.MeshBasicMaterial({ color: 0x0055aa });
-    const mesh = new THREE.LineSegments(geometry, material);
-    scene.add(mesh);
+        geometry.faces = triangulate(geometry.vertices);
+        geometry.computeFaceNormals();
+        const mesh = new THREE.Mesh(geometry, new THREE.MeshPhongMaterial());
+        scene.add(mesh);
+    }
 
     // const entityMaterial = new THREE.MeshBasicMaterial({ color: 0x00aa11, wireframe: true });
 
-    var geo = new THREE.BufferGeometry().fromGeometry(new THREE.BoxGeometry(10, 10, 10))
+    // Entity representations
+    // var geo = new THREE.BufferGeometry().fromGeometry(new THREE.BoxGeometry(10, 10, 10))
 
-    const entityGeos: any[] = [];
+    // const entityGeos: any[] = [];
 
     bsp.entities.forEach(entity => {
         if (!entity.origin) return;
@@ -130,22 +182,23 @@ function loadMap(buffer: ArrayBuffer) {
         const y = parseFloat(split[1]);
         const z = parseFloat(split[2]);
 
-        var geometry = geo.clone()
-        geometry.applyMatrix4(new THREE.Matrix4().makeTranslation(y, z, x));
-        // then, we push this bufferGeometry instance in our array
-        entityGeos.push(geometry)
-    });
-    
-    // Here is the big boy in action
-    var geometriesCubes = mergeBufferGeometries(entityGeos, false);
-    
-    // now we got 1 mega big mesh with 10 000 cubes in it
-    var entityMesh = new THREE.Mesh(geometriesCubes, new THREE.MeshNormalMaterial());
-    scene.add(entityMesh);
+        console.log(entity);
 
-    var stats = new Stats();
-    stats.showPanel(0);
-    document.body.appendChild(stats.dom);
+        switch (entity.classname) {
+            case "light":
+                const light = new THREE.PointLight(0xffffff, .25, 400);
+                light.position.set(y, z, x);
+                scene.add(light);
+                break;
+            // case "info_player_start":
+
+            //     break;
+        }
+    });
+
+    // var geometriesCubes = mergeBufferGeometries(entityGeos, false);
+    // var entityMesh = new THREE.Mesh(geometriesCubes, new THREE.MeshNormalMaterial());
+    // scene.add(entityMesh);
 
     controls.movementSpeed = 500;
     controls.domElement = renderer.domElement;

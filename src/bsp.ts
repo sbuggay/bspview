@@ -1,5 +1,6 @@
 
 import { extract, TypeMapping } from "./binary";
+import { Vector3 } from "three";
 
 const HEADER30 = [
     "ENTITIES",
@@ -57,6 +58,20 @@ interface Plane {
 
 interface Entity {
     origin?: string;
+    classname?: string;
+    _light?: string;
+    style?: string;
+    angle?: number;
+}
+
+interface Model {
+    min: number[];
+    max: number[];
+    origin: number[];
+    nodes: number[];
+    visLeafs: number;
+    firstFace: number;
+    faces: number;
 }
 
 export interface BSP {
@@ -67,6 +82,8 @@ export interface BSP {
     faces: Face[];
     surfEdges: number[];
     entities: Entity[];
+    texInfo: any[];
+    models: Model[]
 }
 
 function parseHeader(buffer: ArrayBuffer) {
@@ -94,17 +111,17 @@ function extractLump(buffer: ArrayBuffer, lump: Lump, types: (keyof TypeMapping)
 }
 
 function parseEntities(entityString: string) {
-    
+
     const split = entityString.split("\n");
     const entities: any[] = [];
-    let tempObject: {[key: string]: string} = {};
+    let tempObject: { [key: string]: string } = {};
 
     split.forEach(line => {
         if (line === "{") {
             // new temp object
             tempObject = {};
         }
-        else if (line === "}") {``
+        else if (line === "}") {
             // push to entities
             entities.push(tempObject);
         }
@@ -140,6 +157,20 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
     const edges = extractLump(buffer, lumps["EDGES"], ["Uint16", "Uint16"]);
     const planes = extractLump(buffer, lumps["PLANES"], ["Float32", "Float32", "Float32", "Float32", "Uint32"]);
     const surfEdges = extractLump(buffer, lumps["SURFEDGES"], ["Int32"]);
+    const texInfo = extractLump(buffer, lumps["TEXINFO"], ["Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Uint32", "Uint32"]);
+
+    const models = extractLump(buffer, lumps["MODELS"], ["Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Int32", "Int32", "Int32", "Int32", "Int32", "Int32", "Int32"]).map(data => {
+        return {
+            min: [data[0], data[1], data[2]],
+            max: [data[3], data[4], data[5]],
+            origin: [data[6], data[7], data[8]],
+            nodes: [data[9], data[10], data[11], data[12]],
+            visLeafs: data[13],
+            firstFace: data[14],
+            faces: data[15]
+        }
+    });
+
 
     const faces = extractLump(buffer, lumps["FACES"], ["Uint16", "Uint16", "Uint32", "Uint16", "Uint16", "Uint32", "Uint32"]).map(data => {
         return {
@@ -153,6 +184,23 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         }
     });
 
+    // Parse textures
+    const textureLump = lumps["TEXTURES"];
+    const textureView = new DataView(buffer.slice(textureLump.offset, textureLump.offset + textureLump.size));
+
+    const numTextures = textureView.getUint32(0, true);
+
+    const offsetView = new DataView(buffer, textureLump.offset + 4, (numTextures * 4));
+    const textureOffsets = extract(offsetView, ["Int32"]);
+
+    textureOffsets.forEach(offset => {
+        const o = textureLump.offset + offset;
+        const name = Buffer.from(buffer.slice(o, o + 16)).toString("ascii");
+        const mipView = new DataView(buffer, o + 16, 24);
+        const data = extract(mipView, ["Uint32", "Uint32", "Uint32", "Uint32", "Uint32", "Uint32"]);
+        console.log(name, data);
+    });
+
     const bsp: BSP = {
         header,
         vertices,
@@ -160,7 +208,9 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         planes,
         entities,
         faces,
-        surfEdges
+        surfEdges,
+        texInfo,
+        models
     };
 
     return bsp;
