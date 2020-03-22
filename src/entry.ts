@@ -77,12 +77,15 @@ async function loadMapFromUrl(url: string) {
     loadMap(buffer);
 }
 
-function loadMap(buffer: ArrayBuffer) {
+async function loadMap(buffer: ArrayBuffer) {
 
     if (controls.controlsFocused) {
         console.warn("Map loaded while controls were focused");
         return;
     }
+
+    // const textureLoader = new THREE.TextureLoader();
+    // const tex = textureLoader.load("https://images.unsplash.com/photo-1531481517150-2228446fb6b0?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&w=1000&q=80");
 
     const scene = new THREE.Scene();
 
@@ -143,13 +146,14 @@ function loadMap(buffer: ArrayBuffer) {
         }
 
         const geometry = new THREE.Geometry();
-
         const face = bsp.faces[faceIndex];
 
         for (let i = 0; i < face.edges; i++) {
 
             const surfEdge = bsp.surfEdges[face.firstEdge + i];
             const edge = bsp.edges[Math.abs(surfEdge)];
+
+
 
             // We only need to care about the first vertex here, the second one will be duplicated in the next edge
             let v1 = bsp.vertices[edge[0]];
@@ -162,9 +166,62 @@ function loadMap(buffer: ArrayBuffer) {
             geometry.vertices.push(new THREE.Vector3(v1.y, v1.z, v1.x));
         }
 
+
+        const texInfo = bsp.texInfo[face.textureInfo];
+        const texture = bsp.textures[texInfo.mipTex];
+        const mip = texture.globalOffset + texture.offset1;
+
+        const t = new Uint8Array(buffer.slice(mip, mip + (texture.width * texture.height)));
+
+        const data = [];
+
+        for (let i = 0; i < t.length; i++) {
+            data.push(t[i]);
+            data.push(t[i]);
+            data.push(t[i]);
+        }
+
+        const tex = new THREE.DataTexture(new Uint8Array(data), texture.width, texture.height, THREE.RGBFormat);
+
+        function assignUVs(geometry: THREE.Geometry) {
+
+            geometry.computeBoundingBox();
+
+            var max = geometry.boundingBox.max,
+                min = geometry.boundingBox.min;
+            var offset = new THREE.Vector2(0 - min.x, 0 - min.y);
+            var range = new THREE.Vector2(max.x - min.x, max.y - min.y);
+            var faces = geometry.faces;
+
+            geometry.faceVertexUvs[0] = [];
+
+            for (var i = 0; i < faces.length; i++) {
+
+                var v1 = geometry.vertices[faces[i].a],
+                    v2 = geometry.vertices[faces[i].b],
+                    v3 = geometry.vertices[faces[i].c];
+
+                geometry.faceVertexUvs[0].push([
+                    new THREE.Vector2((v1.x + offset.x) / range.x, (v1.y + offset.y) / range.y),
+                    new THREE.Vector2((v2.x + offset.x) / range.x, (v2.y + offset.y) / range.y),
+                    new THREE.Vector2((v3.x + offset.x) / range.x, (v3.y + offset.y) / range.y)
+                ]);
+            }
+            geometry.uvsNeedUpdate = true;
+        }
         geometry.faces = triangulate(geometry.vertices);
+
+        assignUVs(geometry);
+
+        let material = new THREE.MeshPhongMaterial({
+            map: tex
+        });
         geometry.computeFaceNormals();
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshPhongMaterial());
+
+        material.needsUpdate = true;
+        geometry.uvsNeedUpdate = true;
+        const mesh = new THREE.Mesh(geometry, material);
+
         scene.add(mesh);
     }
 
@@ -181,8 +238,6 @@ function loadMap(buffer: ArrayBuffer) {
         const x = parseFloat(split[0]);
         const y = parseFloat(split[1]);
         const z = parseFloat(split[2]);
-
-        console.log(entity);
 
         switch (entity.classname) {
             case "light":
