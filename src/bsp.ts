@@ -82,6 +82,7 @@ interface Texture {
     offset2: number;
     offset4: number;
     offset8: number;
+    palette: Uint8Array;
     globalOffset: number; // Offset into the total bsp
 }
 
@@ -228,7 +229,10 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         const o = textureLump.offset + offset;
         const name = Buffer.from(buffer.slice(o, o + 16)).toString("ascii");
         const mipView = new DataView(buffer, o + 16, 24);
-        textures.push(...extract(mipView, ["Uint32", "Uint32", "Uint32", "Uint32", "Uint32", "Uint32"]).map(data => {
+        const data = extract(mipView, ["Uint32", "Uint32", "Uint32", "Uint32", "Uint32", "Uint32"]).map(data => {
+            const paletteOffset = o + data[5] + (data[0] * data[1] / 8) + 2;
+            const paletteSize = 256 * 3;
+            const palette = new Uint8Array(buffer.slice(paletteOffset, paletteOffset + paletteSize));
             return {
                 name,
                 width: data[0],
@@ -237,9 +241,11 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
                 offset2: data[3],
                 offset4: data[4],
                 offset8: data[5],
+                palette,
                 globalOffset: o
             }
-        }));
+        });
+        textures.push(...data);
     });
 
     const bsp: BSP = {

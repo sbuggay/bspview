@@ -2,11 +2,11 @@ import { parseBSP } from "./bsp";
 import * as THREE from "three";
 
 import * as Stats from "stats.js";
-import { FlyControls } from "./FlyControls";
-import { Controls, maps } from "./Controls";
+import { Controls } from "./Controls";
+import { Description, maps } from "./Description";
 import { BspInfo } from "./BspInfo";
-import { mergeBufferGeometries } from "./utils";
-import { Vector3, Face3 } from "three";
+import { triangulate, mergeBufferGeometries } from "./utils";
+import { Vector3, Face3, Mesh } from "three";
 
 const viewElement = document.body;
 const dashboardElement = document.getElementById("dashboard");
@@ -20,9 +20,7 @@ document.body.appendChild(stats.dom);
 const clock = new THREE.Clock();
 const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 10, 3000);
 const renderer = new THREE.WebGLRenderer();
-const controls = new FlyControls(camera, renderer.domElement);
-
-
+const controls = new Controls(camera, renderer.domElement);
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 
@@ -32,7 +30,7 @@ window.onresize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-const controlElement = new Controls(topElement, (event) => {
+const controlElement = new Description(topElement, (event) => {
     const value = (event.target as HTMLSelectElement).value;
     const url = `https://devanbuggay.com/bspview/bsp/${value}`;
     loadMapFromUrl(url);
@@ -84,13 +82,10 @@ async function loadMap(buffer: ArrayBuffer) {
         return;
     }
 
-    // const textureLoader = new THREE.TextureLoader();
-    // const tex = textureLoader.load("https://images.unsplash.com/photo-1531481517150-2228446fb6b0?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&w=1000&q=80");
-
     const scene = new THREE.Scene();
 
     const color = 0xCCCCCC;
-    const intensity = 0.2;
+    const intensity = 0.3;
     const light = new THREE.AmbientLight(color, intensity);
     scene.add(light);
 
@@ -104,23 +99,9 @@ async function loadMap(buffer: ArrayBuffer) {
     const bsp = parseBSP(buffer);
     bspInfo.update(bsp);
 
-    // Triangulating BSP edges is very easy, edge reversal is already done before it reaches here.
-    function triangulate(vertices: Vector3[]): THREE.Face3[] {
-        vertices = vertices.reverse();
-
-        if (vertices.length < 3) {
-            return [];
-        }
-
-        const faces: THREE.Face3[] = [];
-        for (let i = 1; i < vertices.length - 1; i++) {
-            faces.push(new Face3(0, i, i + 1));
-        }
-        return faces;
-    }
-
     // We are going to store each model's starting face here so not to render it as a normal face
     const modelFaces: { [key: number]: number } = {};
+    const modelMeshes: Mesh[] = [];
 
     bsp.models.forEach((model, index) => {
         const depth = Math.abs(model.max[0] - model.min[0]);
@@ -131,12 +112,15 @@ async function loadMap(buffer: ArrayBuffer) {
         const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x00aa11, wireframe: true }));
         mesh.position.set((model.max[1] + model.min[1]) / 2, (model.max[2] + model.min[2]) / 2, (model.max[0] + model.min[0]) / 2)
         mesh.visible = false;
+        modelMeshes.push(mesh);
         scene.add(mesh);
 
         // Add to faceStarts
         if (index === 0) return; // Dont add total face model (is this true for all maps?)
         modelFaces[model.firstFace] = model.faces;
     });
+
+    const faceMeshes: Mesh[] = [];
 
     for (let faceIndex = 0; faceIndex < bsp.faces.length; faceIndex++) {
 
@@ -147,13 +131,12 @@ async function loadMap(buffer: ArrayBuffer) {
 
         const geometry = new THREE.Geometry();
         const face = bsp.faces[faceIndex];
+        const plane = bsp.planes[face.plane];
 
         for (let i = 0; i < face.edges; i++) {
 
             const surfEdge = bsp.surfEdges[face.firstEdge + i];
             const edge = bsp.edges[Math.abs(surfEdge)];
-
-
 
             // We only need to care about the first vertex here, the second one will be duplicated in the next edge
             let v1 = bsp.vertices[edge[0]];
@@ -166,71 +149,26 @@ async function loadMap(buffer: ArrayBuffer) {
             geometry.vertices.push(new THREE.Vector3(v1.y, v1.z, v1.x));
         }
 
-
-        const texInfo = bsp.texInfo[face.textureInfo];
-        const texture = bsp.textures[texInfo.mipTex];
-        const mip = texture.globalOffset + texture.offset1;
-
-        const t = new Uint8Array(buffer.slice(mip, mip + (texture.width * texture.height)));
-
-        const data = [];
-
-        for (let i = 0; i < t.length; i++) {
-            data.push(t[i]);
-            data.push(t[i]);
-            data.push(t[i]);
-        }
-
-        const tex = new THREE.DataTexture(new Uint8Array(data), texture.width, texture.height, THREE.RGBFormat);
-
-        function assignUVs(geometry: THREE.Geometry) {
-
-            geometry.computeBoundingBox();
-
-            var max = geometry.boundingBox.max,
-                min = geometry.boundingBox.min;
-            var offset = new THREE.Vector2(0 - min.x, 0 - min.y);
-            var range = new THREE.Vector2(max.x - min.x, max.y - min.y);
-            var faces = geometry.faces;
-
-            geometry.faceVertexUvs[0] = [];
-
-            for (var i = 0; i < faces.length; i++) {
-
-                var v1 = geometry.vertices[faces[i].a],
-                    v2 = geometry.vertices[faces[i].b],
-                    v3 = geometry.vertices[faces[i].c];
-
-                geometry.faceVertexUvs[0].push([
-                    new THREE.Vector2((v1.x + offset.x) / range.x, (v1.y + offset.y) / range.y),
-                    new THREE.Vector2((v2.x + offset.x) / range.x, (v2.y + offset.y) / range.y),
-                    new THREE.Vector2((v3.x + offset.x) / range.x, (v3.y + offset.y) / range.y)
-                ]);
-            }
-            geometry.uvsNeedUpdate = true;
-        }
         geometry.faces = triangulate(geometry.vertices);
-
-        assignUVs(geometry);
-
-        let material = new THREE.MeshPhongMaterial({
-            map: tex
-        });
         geometry.computeFaceNormals();
 
-        material.needsUpdate = true;
-        geometry.uvsNeedUpdate = true;
-        const mesh = new THREE.Mesh(geometry, material);
+        // assignUVs(geometry);
+        // t1.wrapS = THREE.ClampToEdgeWrapping;
+        // t1.wrapT = THREE.ClampToEdgeWrapping;
 
+        let material = new THREE.MeshPhongMaterial({
+            // map: t1
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        faceMeshes.push(mesh);
         scene.add(mesh);
     }
 
-    // const entityMaterial = new THREE.MeshBasicMaterial({ color: 0x00aa11, wireframe: true });
 
-    // Entity representations
-    // var geo = new THREE.BufferGeometry().fromGeometry(new THREE.BoxGeometry(10, 10, 10))
-
-    // const entityGeos: any[] = [];
+    //Entity representations
+    const baseGeometry = new THREE.BufferGeometry().fromGeometry(new THREE.BoxGeometry(10, 10, 10))
+    const entityGeos: any[] = [];
 
     bsp.entities.forEach(entity => {
         if (!entity.origin) return;
@@ -249,14 +187,59 @@ async function loadMap(buffer: ArrayBuffer) {
 
             //     break;
         }
+
+        var geometry = baseGeometry.clone()
+        geometry.applyMatrix4(new THREE.Matrix4().makeTranslation(y, z, x));
+        // then, we push this bufferGeometry instance in our array
+        entityGeos.push(geometry)
     });
 
-    // var geometriesCubes = mergeBufferGeometries(entityGeos, false);
-    // var entityMesh = new THREE.Mesh(geometriesCubes, new THREE.MeshNormalMaterial());
-    // scene.add(entityMesh);
+    const geometriesCubes = mergeBufferGeometries(entityGeos, false);
+    const entityMesh = new THREE.Mesh(geometriesCubes, new THREE.MeshNormalMaterial());
+    entityMesh.visible = false;
+    scene.add(entityMesh);
 
-    controls.movementSpeed = 500;
+    controls.movementSpeed = 300;
     controls.domElement = renderer.domElement;
+
+    // Register hotkeys
+
+    let viewMode = 0; // 0 - phong, 1 - normal, 2 - wireframe
+    controls.registerHotkey(49, () => {
+        viewMode = (viewMode + 1) % 3;
+        let material: THREE.Material = null;
+        switch (viewMode) {
+            case 0:
+                material = new THREE.MeshPhongMaterial()
+                break;
+            case 1:
+                material = new THREE.MeshNormalMaterial();
+                break;
+            case 2:
+                material = new THREE.MeshBasicMaterial({ wireframe: true });
+                break;
+        }
+
+        if (material === null) {
+            material = new THREE.MeshBasicMaterial();
+        }
+
+        faceMeshes.forEach(face => {
+            face.material = material;
+            face.updateMatrix()
+        });
+
+    });
+
+    controls.registerHotkey(50, () => {
+        modelMeshes.forEach(model => {
+            model.visible = !model.visible;
+        });
+    });
+
+    controls.registerHotkey(51, () => {
+        entityMesh.visible = !entityMesh.visible;
+    });
 
     const render = function () {
         const delta = clock.getDelta();
@@ -268,7 +251,6 @@ async function loadMap(buffer: ArrayBuffer) {
     };
 
     render();
-
 }
 
 registerDragEvents();

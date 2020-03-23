@@ -1,6 +1,7 @@
 // Copied from https://github.com/mrdoob/three.js/blob/master/examples/jsm/utils/BufferGeometryUtils.js
 
 import * as THREE from "three";
+import { Vector3, Face3 } from "three";
 
 /**
 	 * @param  {Array<BufferGeometry>} geometries
@@ -8,6 +9,7 @@ import * as THREE from "three";
 	 * @return {BufferGeometry}
 	 */
 export function mergeBufferGeometries(geometries: any[], useGroups: any) {
+
     var isIndexed = geometries[0].index !== null;
     var attributesUsed = new Set(Object.keys(geometries[0].attributes));
     var morphAttributesUsed = new Set(Object.keys(geometries[0].morphAttributes));
@@ -154,4 +156,19 @@ function mergeBufferAttributes(attributes: any) {
     }
 
     return new THREE.BufferAttribute(array, itemSize, normalized);
+}
+
+// Triangulating BSP edges is very easy, edge reversal is already done before it reaches here.
+export function triangulate(vertices: Vector3[]): THREE.Face3[] {
+    vertices = vertices.reverse();
+
+    if (vertices.length < 3) {
+        return [];
+    }
+
+    const faces: THREE.Face3[] = [];
+    for (let i = 1; i < vertices.length - 1; i++) {
+        faces.push(new Face3(0, i, i + 1));
+    }
+    return faces;
 }
