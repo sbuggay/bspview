@@ -1,71 +1,198 @@
-export const maps = [
-    "halflife_c1a0.bsp",
-    "halflife_c1a0a.bsp",
-    "halflife_c1a0b.bsp",
-    "halflife_c1a0c.bsp",
-    "halflife_c1a0e.bsp",
-    "halflife_c1a0e.bsp",
-    "de_dust.bsp",
-    "de_dust2.bsp",
-    "de_inferno.bsp",
-    "de_cbble.bsp",
-    "quake_start.bsp"
-];
+/**
+ * @author James Baicoianu / http://www.baicoianu.com/
+ */
+
+import * as THREE from "three";
+
+const Vector3 = THREE.Vector3;
+const Quaternion = THREE.Quaternion;
 
 export class Controls {
+    camera: THREE.Camera;
+    domElement: HTMLCanvasElement;
+    movementSpeed: number;
+    rollSpeed: number;
+    tmpQuaternion: any;
 
-    public element: HTMLElement;
-    public detailsElement: HTMLElement;
-    public select: HTMLSelectElement;
+    moveState: any;
+    moveVector: any;
+    rotationVector: any;
+    movementSpeedMultiplier: number;
 
-    constructor(element: HTMLElement, callback: ((evt: Event) => any)) {
-        this.element = element;
-        this.select = document.createElement("select");
-        this.select.style.width = "300px";
-        this.select.style.fontSize = "1.5em";
+    _mousemove: any;
+    _mousedown: any;
+    _mouseup: any;
+    _keydown: any;
+    _keyup: any;
 
-        maps.forEach(map => {
-            const option = document.createElement("option");
-            option.text = map;
-            this.select.add(option);
-        });
+    hotkeys: { [key: number]: () => void };
 
-        this.select.addEventListener("change", callback);
+    public controlsFocused: boolean;
 
-        element.appendChild(this.select);
+    constructor(camera: THREE.Camera, domElement: HTMLCanvasElement) {
+        this.camera = camera;
+        this.domElement = domElement;
+        if (domElement) this.domElement.setAttribute("tabindex", "-1    ");
 
-        const detailsElement = document.createElement("div");
-        detailsElement.className = "details";
+        this.movementSpeed = 1.0;
+        this.rollSpeed = 0.005;
+        this.tmpQuaternion = new Quaternion();
 
-        this.detailsElement = detailsElement;
-        element.appendChild(this.detailsElement);
+        this.moveState = { up: 0, down: 0, left: 0, right: 0, forward: 0, back: 0, pitchUp: 0, pitchDown: 0, yawLeft: 0, yawRight: 0, rollLeft: 0, rollRight: 0 };
+        this.moveVector = new Vector3(0, 0, 0);
+        this.rotationVector = new Vector3(0, 0, 0);
+        this.movementSpeedMultiplier = 1;
 
-        // Build controls
+        this._mousemove = this.bind(this, this.mousemove);
+        this._mousedown = this.bind(this, this.mousedown);
+        this._keydown = this.bind(this, this.keydown);
+        this._keyup = this.bind(this, this.keyup);
 
-        this.addText("Click anywhere to lock the pointer");
-        this.addText("WASD to move");
-        this.addText("F to toggle fullscreen");
-        this.addText("Use the dropdown to change maps");
-        this.addText("Drag and drop a .bsp to load it")
+        this.hotkeys = {};
 
+        this.domElement.addEventListener("contextmenu", this.contextmenu, false);
+        this.domElement.addEventListener("mousemove", this._mousemove, false);
+        this.domElement.addEventListener("mousedown", this._mousedown, false);
+        this.domElement.addEventListener("mouseup", this._mouseup, false);
 
-        const github = document.createElement("a");
-        github.href = "https://github.com/sbuggay/bspview";
-        github.innerText = "https://github.com/sbuggay/bspview";
-        
-        const githubDiv = document.createElement("div");
-        githubDiv.appendChild(github);
-        githubDiv.style.paddingTop = "20px";
+        document.addEventListener("pointerlockchange", lockChangeAlert.bind(this), false);
+        document.addEventListener("mozpointerlockerror", lockChangeAlert.bind(this), false);
 
-        this.detailsElement.appendChild(githubDiv);
-        
+        function lockChangeAlert() {
+            if (document.pointerLockElement === this.domElement) {
+                this.controlsFocused = true;
+            }
+            else {
+                this.controlsFocused = false;
+            }
+        }
+
+        window.addEventListener("keydown", this._keydown, false);
+        window.addEventListener("keyup", this._keyup, false);
+
+        this.updateMovementVector();
+
+        this.controlsFocused = false;
     }
 
-    addText(data: string) {
-        const div = document.createElement("div");
-        div.className = "row";
-        div.innerText = data;
-        this.detailsElement.appendChild(div);
+    keydown(event: any) {
+
+        if (event.altKey) {
+            return;
+        }
+
+        switch (event.keyCode) {
+            case 16: /* shift */ this.movementSpeedMultiplier = .1; break;
+            case 87: /*W*/ this.moveState.forward = 1; break;
+            case 83: /*S*/ this.moveState.back = 1; break;
+            case 65: /*A*/ this.moveState.left = 1; break;
+            case 68: /*D*/ this.moveState.right = 1; break;
+            case 70: /*F*/ this.toggleFullscreen(); break;
+        }
+
+        if (this.hotkeys[event.keyCode]) {
+            this.hotkeys[event.keyCode]();
+        }
+
+        this.updateMovementVector();
+
+        event.preventDefault();
+
+    };
+
+    keyup(event: any) {
+
+        switch (event.keyCode) {
+            case 16: /* shift */ this.movementSpeedMultiplier = 1; break;
+            case 87: /*W*/ this.moveState.forward = 0; break;
+            case 83: /*S*/ this.moveState.back = 0; break;
+            case 65: /*A*/ this.moveState.left = 0; break;
+            case 68: /*D*/ this.moveState.right = 0; break;
+        }
+
+        this.updateMovementVector();
+
+        event.preventDefault();
+    };
+
+    mousedown(event: any) {
+        this.domElement.requestPointerLock();
+        event.preventDefault();
+        event.stopPropagation();
+    };
+
+    mousemove(event: any) {
+        if (this.controlsFocused) {
+            var xAxis = new THREE.Vector3(1, 0, 0);
+            var yAxis = new THREE.Vector3(0, 1, 0);
+            this.camera.rotateOnAxis(xAxis, event.movementY * -0.002);
+            this.camera.rotateOnWorldAxis(yAxis, event.movementX * -0.002);
+        }
+    };
+
+    toggleFullscreen() {
+
+        if (!document.fullscreenElement) {
+            this.domElement.requestPointerLock();
+            this.domElement.requestFullscreen().catch(err => {
+                alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
     }
 
+    registerHotkey(keyCode: number, callback: () => void) {
+        this.hotkeys[keyCode] = callback;
+    }
+
+
+    update(delta: any) {
+
+        var moveMult = delta * this.movementSpeed;
+        var rotMult = delta * this.rollSpeed;
+
+        this.camera.translateX(this.moveVector.x * moveMult);
+        this.camera.translateY(this.moveVector.y * moveMult);
+        this.camera.translateZ(this.moveVector.z * moveMult);
+
+        this.tmpQuaternion.set(this.rotationVector.x * rotMult, this.rotationVector.y * rotMult, this.rotationVector.z * rotMult, 1).normalize();
+        this.camera.quaternion.multiply(this.tmpQuaternion);
+
+        // expose the rotation vector for convenience
+        this.camera.rotation.setFromQuaternion(this.camera.quaternion, this.camera.rotation.order);
+
+
+    };
+
+    updateMovementVector() {
+        var forward = (this.moveState.forward || (false && !this.moveState.back)) ? 1 : 0;
+
+        this.moveVector.x = (- this.moveState.left + this.moveState.right);
+        this.moveVector.y = (- this.moveState.down + this.moveState.up);
+        this.moveVector.z = (- forward + this.moveState.back);
+    };
+
+
+    bind(scope: any, fn: any) {
+        return function () {
+            fn.apply(scope, arguments);
+        };
+    }
+
+    contextmenu(event: any) {
+        event.preventDefault();
+    }
+
+    dispose() {
+
+        this.domElement.removeEventListener("contextmenu", this.contextmenu, false);
+        this.domElement.removeEventListener("mousedown", this._mousedown, false);
+        this.domElement.removeEventListener("mousemove", this._mousemove, false);
+
+        window.removeEventListener("keydown", this._keydown, false);
+        window.removeEventListener("keyup", this._keyup, false);
+
+    };
 }
+
