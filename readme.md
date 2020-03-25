@@ -37,9 +37,9 @@ Right now the BSPs are hardcoded to being loaded from this GitHub repo though.
 
 - ~~Face rendering~~
 - Basic texturing support (if texture aren't from .WAD)
-- Some basic lightmap support
+- Basic lightmap support
 - Implement the visibility system
-- Adding Source engine support (https://developer.valvesoftware.com/wiki/Source_BSP_File_Format)
+- Source engine support (https://developer.valvesoftware.com/wiki/Source_BSP_File_Format)
 
 ## Reference
 
