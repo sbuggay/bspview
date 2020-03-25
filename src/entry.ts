@@ -151,72 +151,7 @@ async function loadMap(buffer: ArrayBuffer) {
                 v1 = bsp.vertices[edge[1]];
             }
 
-            if (i === 0) {
-                // const box = new THREE.BoxGeometry(10, 10, 10);
-                // box.applyMatrix4(new THREE.Matrix4().makeTranslation(v1.y, v1.z, v1.x));
-                // const mesh = new THREE.Mesh(box, new THREE.MeshBasicMaterial({ color: new Color(1, 0, 0) }));
-                // scene.add(mesh);
-
-            }
-
             geometry.vertices.push(new THREE.Vector3(v1.y, v1.z, v1.x));
-        }
-
-
-        // const texInfo = bsp.texInfo[face.textureInfo];
-        // const texture = bsp.textures[texInfo.mipTex];
-
-        // const t = texture.pixels1;
-
-        // const data = [];
-
-        // for (let i = 0; i < t.length; i++) {
-        //     data.push(texture.palette[t[i]][0]);
-        //     data.push(texture.palette[t[i]][1]);
-        //     data.push(texture.palette[t[i]][2]);
-        // }
-
-        // const t1 = new THREE.DataTexture(new Uint8Array(data), texture.width, texture.height, THREE.RGBFormat);
-        // const u_axis = texInfo.vs;
-        // const v_axis = texInfo.vt;
-
-        function assignUVs(geometry: THREE.Geometry) {
-            const u = (x: number, y: number, z: number) => Math.abs(x * u_axis[1] + y * u_axis[2] + z * u_axis[0]);
-            const v = (x: number, y: number, z: number) => Math.abs(x * v_axis[1] + y * v_axis[2] + z * v_axis[0]);
-
-            geometry.computeBoundingBox();
-
-            geometry.faceVertexUvs[0] = [];
-            let first = geometry.vertices[0];
-
-            geometry.faces.forEach((face, i) => {
-
-                const box = geometry.boundingBox;
-                const size = box.min.distanceTo(box.max);
-                const planeVector = new Vector3(plane.y, plane.z, plane.x);
-
-                // Generate local vertices
-                const localVertices: THREE.Vector3[] = [];
-                localVertices.push(new THREE.Vector3(0, 0, 0));
-
-                for (let i = 1; i < geometry.vertices.length; i++) {
-                    const vertex = new Vector3(geometry.vertices[i].x, geometry.vertices[i].y, geometry.vertices[i].z).sub(first).divideScalar(size);
-                    localVertices.push(vertex);
-                }
-
-                const v1 = localVertices[face.a];
-                const v2 = localVertices[face.b];
-                const v3 = localVertices[face.c];
-
-                geometry.faceVertexUvs[0].push([
-                    new THREE.Vector2(u(v1.x, v1.y, v1.z), v(v1.x, v1.y, v1.z)),
-                    new THREE.Vector2(u(v2.x, v2.y, v2.z), v(v2.x, v2.y, v2.z)),
-                    new THREE.Vector2(u(v3.x, v3.y, v3.z), v(v3.x, v3.y, v3.z))
-                ]);
-
-            });
-
-            geometry.uvsNeedUpdate = true
         }
 
         geometry.faces = triangulate(geometry.vertices);
