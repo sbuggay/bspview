@@ -12,7 +12,7 @@ export const maps = [
     "quake_start.bsp"
 ];
 
-export class Description {
+export class DescriptionInfo {
 
     public element: HTMLElement;
     public detailsElement: HTMLElement;
@@ -21,7 +21,7 @@ export class Description {
     constructor(element: HTMLElement, callback: ((evt: Event) => any)) {
         this.element = element;
         this.select = document.createElement("select");
-        this.select.style.width = "300px";
+        this.select.style.width = "320px";
         this.select.style.fontSize = "1.5em";
 
         maps.forEach(map => {
@@ -49,7 +49,6 @@ export class Description {
         this.addText("3 - Toggle entity visibility");
         this.addText("Use the dropdown to change maps");
         this.addText("Drag and drop a .bsp to load it");
-
 
         const github = document.createElement("a");
         github.href = "https://github.com/sbuggay/bspview";

@@ -1,4 +1,4 @@
-import { BSP, Lump } from "./bsp";
+import { BSP, Lump } from "../bsp";
 
 const idMapping: { [key: number]: string } = {
     29: "Quake",
@@ -11,7 +11,7 @@ export class BspInfo {
 
     constructor(parent: HTMLElement) {
         this.element = document.createElement("div");
-        this.element.style.padding = "5px";
+        this.element.style.padding = "8px";
 
         parent.appendChild(this.element);
     }
@@ -48,6 +48,5 @@ export class BspInfo {
         this.addRow("Surfedges: ", bsp.surfEdges.length.toString());
         this.addRow("Faces: ", bsp.faces.length.toString());
         this.addRow("Planes: ", bsp.planes.length.toString());
-
     }
 }

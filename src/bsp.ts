@@ -82,7 +82,11 @@ interface Texture {
     offset2: number;
     offset4: number;
     offset8: number;
-    palette: Uint8Array;
+    pixels1: Uint8Array;
+    pixels2: Uint8Array;
+    pixels4: Uint8Array;
+    pixels8: Uint8Array;
+    palette: number[][];
     globalOffset: number; // Offset into the total bsp
 }
 
@@ -230,21 +234,40 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         const name = Buffer.from(buffer.slice(o, o + 16)).toString("ascii");
         const mipView = new DataView(buffer, o + 16, 24);
         const data = extract(mipView, ["Uint32", "Uint32", "Uint32", "Uint32", "Uint32", "Uint32"]).map(data => {
-            const paletteOffset = o + data[5] + (data[0] * data[1] / 8) + 2;
-            const paletteSize = 256 * 3;
-            const palette = new Uint8Array(buffer.slice(paletteOffset, paletteOffset + paletteSize));
+            const width = data[0];
+            const height = data[1];
+            const offset1 = data[2];
+            const offset2 = data[3];
+            const offset4 = data[4];
+            const offset8 = data[5];
+            const pixels1 = new Uint8Array(buffer.slice(o + offset1, o + offset1 + width * height));
+            const pixels2 = new Uint8Array(buffer.slice(o + offset2, o + offset2 + Math.floor((width * height) / 4)));
+            const pixels4 = new Uint8Array(buffer.slice(o + offset4, o + offset4 + Math.floor((width * height) / 8)));
+            const pixels8 = new Uint8Array(buffer.slice(o + offset8, o + offset8 + Math.floor((width * height) / 16)));
+            const palleteOffset = o + offset8 + Math.floor((width * height) / 16);
+            const paletteArray = new Uint8Array(buffer.slice(palleteOffset, palleteOffset + (256 * 3)));
+            const palette: number[][] = [];
+            for (let i = 0; i < 256; i++) {
+                palette.push([paletteArray[i * 3], paletteArray[i * 3 + 1], paletteArray[i * 3 + 2]]);
+            }
             return {
                 name,
-                width: data[0],
-                height: data[1],
-                offset1: data[2],
-                offset2: data[3],
-                offset4: data[4],
-                offset8: data[5],
+                width,
+                height,
+                offset1,
+                offset2,
+                offset4,
+                offset8,
+                pixels1,
+                pixels2,
+                pixels4,
+                pixels8,
                 palette,
                 globalOffset: o
             }
         });
+
+        console.log(data);
         textures.push(...data);
     });
 
