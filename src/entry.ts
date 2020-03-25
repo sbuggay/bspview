@@ -3,10 +3,10 @@ import * as THREE from "three";
 
 import * as Stats from "stats.js";
 import { Controls } from "./Controls";
-import { Description, maps } from "./Description";
-import { BspInfo } from "./BspInfo";
+import { DescriptionInfo, maps } from "./info/DescriptionInfo";
+import { BspInfo } from "./info/BspInfo";
 import { triangulate, mergeBufferGeometries } from "./utils";
-import { Vector3, Face3, Mesh } from "three";
+import { Vector3, Face3, Mesh, Color, Quaternion, Vector2, Material } from "three";
 
 const viewElement = document.body;
 const dashboardElement = document.getElementById("dashboard");
@@ -21,6 +21,7 @@ const clock = new THREE.Clock();
 const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 10, 3000);
 const renderer = new THREE.WebGLRenderer();
 const controls = new Controls(camera, renderer.domElement);
+const raycaster = new THREE.Raycaster();
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 
@@ -30,13 +31,17 @@ window.onresize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-const controlElement = new Description(topElement, (event) => {
+const controlElement = new DescriptionInfo(topElement, (event) => {
     const value = (event.target as HTMLSelectElement).value;
     const url = `https://devanbuggay.com/bspview/bsp/${value}`;
     loadMapFromUrl(url);
 });
 
 const bspInfo = new BspInfo(bottomElement);
+
+const textureLoader = new THREE.TextureLoader();
+const tex = textureLoader.load("https://i.imgur.com/CslEXIS.jpg");
+
 
 function registerDragEvents() {
     ["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
@@ -146,15 +151,78 @@ async function loadMap(buffer: ArrayBuffer) {
                 v1 = bsp.vertices[edge[1]];
             }
 
+            if (i === 0) {
+                // const box = new THREE.BoxGeometry(10, 10, 10);
+                // box.applyMatrix4(new THREE.Matrix4().makeTranslation(v1.y, v1.z, v1.x));
+                // const mesh = new THREE.Mesh(box, new THREE.MeshBasicMaterial({ color: new Color(1, 0, 0) }));
+                // scene.add(mesh);
+
+            }
+
             geometry.vertices.push(new THREE.Vector3(v1.y, v1.z, v1.x));
+        }
+
+
+        // const texInfo = bsp.texInfo[face.textureInfo];
+        // const texture = bsp.textures[texInfo.mipTex];
+
+        // const t = texture.pixels1;
+
+        // const data = [];
+
+        // for (let i = 0; i < t.length; i++) {
+        //     data.push(texture.palette[t[i]][0]);
+        //     data.push(texture.palette[t[i]][1]);
+        //     data.push(texture.palette[t[i]][2]);
+        // }
+
+        // const t1 = new THREE.DataTexture(new Uint8Array(data), texture.width, texture.height, THREE.RGBFormat);
+        // const u_axis = texInfo.vs;
+        // const v_axis = texInfo.vt;
+
+        function assignUVs(geometry: THREE.Geometry) {
+            const u = (x: number, y: number, z: number) => Math.abs(x * u_axis[1] + y * u_axis[2] + z * u_axis[0]);
+            const v = (x: number, y: number, z: number) => Math.abs(x * v_axis[1] + y * v_axis[2] + z * v_axis[0]);
+
+            geometry.computeBoundingBox();
+
+            geometry.faceVertexUvs[0] = [];
+            let first = geometry.vertices[0];
+
+            geometry.faces.forEach((face, i) => {
+
+                const box = geometry.boundingBox;
+                const size = box.min.distanceTo(box.max);
+                const planeVector = new Vector3(plane.y, plane.z, plane.x);
+
+                // Generate local vertices
+                const localVertices: THREE.Vector3[] = [];
+                localVertices.push(new THREE.Vector3(0, 0, 0));
+
+                for (let i = 1; i < geometry.vertices.length; i++) {
+                    const vertex = new Vector3(geometry.vertices[i].x, geometry.vertices[i].y, geometry.vertices[i].z).sub(first).divideScalar(size);
+                    localVertices.push(vertex);
+                }
+
+                const v1 = localVertices[face.a];
+                const v2 = localVertices[face.b];
+                const v3 = localVertices[face.c];
+
+                geometry.faceVertexUvs[0].push([
+                    new THREE.Vector2(u(v1.x, v1.y, v1.z), v(v1.x, v1.y, v1.z)),
+                    new THREE.Vector2(u(v2.x, v2.y, v2.z), v(v2.x, v2.y, v2.z)),
+                    new THREE.Vector2(u(v3.x, v3.y, v3.z), v(v3.x, v3.y, v3.z))
+                ]);
+
+            });
+
+            geometry.uvsNeedUpdate = true
         }
 
         geometry.faces = triangulate(geometry.vertices);
         geometry.computeFaceNormals();
 
         // assignUVs(geometry);
-        // t1.wrapS = THREE.ClampToEdgeWrapping;
-        // t1.wrapT = THREE.ClampToEdgeWrapping;
 
         let material = new THREE.MeshPhongMaterial({
             // map: t1
@@ -205,7 +273,7 @@ async function loadMap(buffer: ArrayBuffer) {
     // Register hotkeys
 
     let viewMode = 0; // 0 - phong, 1 - normal, 2 - wireframe
-    controls.registerHotkey(49, () => {
+    controls.registerHotkey(49, () => { // 1
         viewMode = (viewMode + 1) % 3;
         let material: THREE.Material = null;
         switch (viewMode) {
@@ -228,17 +296,32 @@ async function loadMap(buffer: ArrayBuffer) {
             face.material = material;
             face.updateMatrix()
         });
-
     });
 
-    controls.registerHotkey(50, () => {
+    controls.registerHotkey(50, () => { // 2
         modelMeshes.forEach(model => {
             model.visible = !model.visible;
         });
     });
 
-    controls.registerHotkey(51, () => {
+    controls.registerHotkey(51, () => { // 3
         entityMesh.visible = !entityMesh.visible;
+    });
+
+    controls.registerHotkey(81, () => { // Q
+        // Highlight center face
+        raycaster.setFromCamera(new Vector2(0, 0), camera);
+        const intersects = raycaster.intersectObjects(scene.children);
+        if (intersects.length > 0) {
+            const closestObject = intersects[0].object as THREE.Mesh;
+            if (closestObject.geometry instanceof THREE.Geometry) {
+                console.log(closestObject.geometry.faceVertexUvs);
+            }
+        }
+    });
+
+    controls.registerHotkey(220, () => {  // \
+        controls.invertMouseY = !controls.invertMouseY;
     });
 
     const render = function () {
