@@ -18,6 +18,7 @@ export class Controls {
     moveVector: any;
     rotationVector: any;
     movementSpeedMultiplier: number;
+    invertMouseY: boolean;
 
     _mousemove: any;
     _mousedown: any;
@@ -47,6 +48,7 @@ export class Controls {
         this._mousedown = this.bind(this, this.mousedown);
         this._keydown = this.bind(this, this.keydown);
         this._keyup = this.bind(this, this.keyup);
+        this.invertMouseY = false;
 
         this.hotkeys = {};
 
@@ -125,7 +127,7 @@ export class Controls {
         if (this.controlsFocused) {
             var xAxis = new THREE.Vector3(1, 0, 0);
             var yAxis = new THREE.Vector3(0, 1, 0);
-            this.camera.rotateOnAxis(xAxis, event.movementY * -0.002 * this.mouseYMultiplier);
+            this.camera.rotateOnAxis(xAxis, event.movementY * -0.002 * (this.invertMouseY ? -1 : 1));
             this.camera.rotateOnWorldAxis(yAxis, event.movementX * -0.002);
         }
     };
