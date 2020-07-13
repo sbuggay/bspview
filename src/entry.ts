@@ -1,12 +1,14 @@
-import { parseBSP } from "./bsp";
+import { parseBSP, Node } from "./bsp";
 import * as THREE from "three";
 
 import * as Stats from "stats.js";
 import { Controls } from "./Controls";
 import { DescriptionInfo, maps } from "./info/DescriptionInfo";
 import { BspInfo } from "./info/BspInfo";
-import { triangulate, mergeBufferGeometries } from "./utils";
-import { Vector3, Face3, Mesh, Color, Quaternion, Vector2, Material } from "three";
+import { triangulate, mergeBufferGeometries, triangulateUV } from "./utils";
+import { Vector3, Face3, Mesh, Color, Quaternion, Vector2, Material, Box3, CameraHelper, Plane } from "three";
+
+const LIGHT_LIMIT = 8;
 
 const viewElement = document.body;
 const dashboardElement = document.getElementById("dashboard");
@@ -17,9 +19,12 @@ var stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
 
+var canvas = document.createElement('canvas');
+var context = canvas.getContext('webgl2', { alpha: false });
+
 const clock = new THREE.Clock();
 const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 10, 3000);
-const renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer({ canvas, context });
 const controls = new Controls(camera, renderer.domElement);
 const raycaster = new THREE.Raycaster();
 
@@ -38,9 +43,6 @@ const controlElement = new DescriptionInfo(topElement, (event) => {
 });
 
 const bspInfo = new BspInfo(bottomElement);
-
-const textureLoader = new THREE.TextureLoader();
-const tex = textureLoader.load("https://i.imgur.com/CslEXIS.jpg");
 
 
 function registerDragEvents() {
@@ -88,15 +90,14 @@ async function loadMap(buffer: ArrayBuffer) {
     }
 
     const scene = new THREE.Scene();
-
-    const color = 0xCCCCCC;
-    const intensity = 0.3;
-    const light = new THREE.AmbientLight(color, intensity);
+    const light = new THREE.AmbientLight(0xCCCCCC, 0.3);
     scene.add(light);
 
     const near = 10;
-    const far = 1000;
+    const far = 2000;
     scene.fog = new THREE.Fog(0x00000, near, far);
+
+    let lightSources = 0;
 
     // reset camera position
     camera.position.set(0, 0, 0);
@@ -121,22 +122,50 @@ async function loadMap(buffer: ArrayBuffer) {
         scene.add(mesh);
 
         // Add to faceStarts
-        if (index === 0) return; // Dont add total face model (is this true for all maps?)
+        if (index === 0) return; // Dont add first face model (is this true for all maps?)
         modelFaces[model.firstFace] = model.faces;
     });
 
-    const faceMeshes: Mesh[] = [];
+    const nodes: Mesh[] = [];
 
-    for (let faceIndex = 0; faceIndex < bsp.faces.length; faceIndex++) {
+    bsp.nodes.forEach(node => {
 
-        if (modelFaces[faceIndex] > 0) {
-            faceIndex += modelFaces[faceIndex] - 1;
-            continue
-        }
+        const min = new Vector3(node.bbox[0].y, node.bbox[0].z, node.bbox[0].x);
+        const max = new Vector3(node.bbox[1].y, node.bbox[1].z, node.bbox[1].x);
+        const geometry = new THREE.BoxGeometry(max.x - min.x, max.y - min.y, max.z - min.z);
+        const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true }));
+        mesh.position.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2);
 
+        mesh.visible = false;
+        nodes.push(mesh);
+        scene.add(mesh);
+
+    });
+
+
+    function getGeometryFromFace(faceIndex: number) {
         const geometry = new THREE.Geometry();
         const face = bsp.faces[faceIndex];
-        const plane = bsp.planes[face.plane];
+
+        if (face === undefined) return new THREE.Mesh();
+
+        const texinfo = bsp.texInfo[face.textureInfo];
+        const miptex = bsp.textures[texinfo.mipTex];
+        const uvs = [];
+
+        const mip = miptex.globalOffset + miptex.offset1;
+        const t = new Uint8Array(buffer.slice(mip, mip + (miptex.width * miptex.height)));
+
+        const data = [];
+
+        for (let i = 0; i < t.length; i++) {
+            data.push(miptex.palette[t[i]][0]);
+            data.push(miptex.palette[t[i]][1]);
+            data.push(miptex.palette[t[i]][2]);
+        }
+
+        const tex = new THREE.DataTexture(new Uint8Array(data), miptex.width, miptex.height, THREE.RGBFormat);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
 
         for (let i = 0; i < face.edges; i++) {
 
@@ -151,23 +180,102 @@ async function loadMap(buffer: ArrayBuffer) {
                 v1 = bsp.vertices[edge[1]];
             }
 
-            geometry.vertices.push(new THREE.Vector3(v1.y, v1.z, v1.x));
+            const vertex = new THREE.Vector3(v1.y, v1.z, v1.x);
+            geometry.vertices.push(vertex);
+
+            const vectorS = new Vector3(texinfo.vs.y, texinfo.vs.z, texinfo.vs.x);
+            const vectorT = new Vector3(texinfo.vt.y, texinfo.vt.z, texinfo.vt.x);
+            const U = (vertex.dot(vectorS) + texinfo.sShift) / miptex.width;
+            const V = (vertex.dot(vectorT) + texinfo.tShift) / miptex.height;
+
+            uvs.push(new Vector2(U, V));
         }
 
         geometry.faces = triangulate(geometry.vertices);
+        geometry.faceVertexUvs[0] = triangulateUV(uvs);
+        
         geometry.computeFaceNormals();
+        geometry.uvsNeedUpdate = true;
 
-        // assignUVs(geometry);
+        const material = new THREE.MeshStandardMaterial({ map: tex });
 
-        let material = new THREE.MeshPhongMaterial({
-            // map: t1
-        });
-
-        const mesh = new THREE.Mesh(geometry, material);
-        faceMeshes.push(mesh);
-        scene.add(mesh);
+        return new THREE.Mesh(geometry, material);
     }
 
+    const faceMeshes: Mesh[] = [];
+    const levelMesh = new THREE.Mesh();
+    const leafFaceMeshes: Mesh[][] = [];
+    const leaves: Mesh[] = [];
+
+    // First model is always the parent level node
+    const levelModel = bsp.models[0];
+    const levelNodes = [bsp.nodes[levelModel.nodes[0]]];
+    const levelLeaves = [];
+
+    while(levelNodes.length > 0) {
+        const n = levelNodes.pop();
+        const front = n.front;
+        const back = n.back;
+
+        if (front < 0) {
+            levelLeaves.push(Math.abs(front) - 1);
+        }
+        else {
+            levelNodes.push(bsp.nodes[front])
+        }
+
+        if (back < 0) {
+            levelLeaves.push(Math.abs(back) - 1);
+        }
+        else {
+            levelNodes.push(bsp.nodes[back])
+        }
+    }
+
+    levelLeaves.forEach(leafId => {
+        const leaf = bsp.leaves[leafId];
+        const min = new Vector3(leaf.bbox[0].y, leaf.bbox[0].z, leaf.bbox[0].x);
+        const max = new Vector3(leaf.bbox[1].y, leaf.bbox[1].z, leaf.bbox[1].x);
+        const geometry = new THREE.BoxGeometry(max.x - min.x, max.y - min.y, max.z - min.z);
+        const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffaaff, wireframe: true }));
+        mesh.position.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2)
+
+        leaves.push(mesh);
+
+        //scene.add(mesh);
+
+        const faces: Mesh[] = [];
+
+        const geom = new THREE.Geometry();
+
+        for (let i = leaf.face; i < leaf.face + leaf.faces; i++) {
+            const faceMesh = getGeometryFromFace(i);
+            faces.push(faceMesh);
+            geom.mergeMesh(faceMesh);
+            // scene.add(faceMesh);
+        }
+
+        scene.add(new THREE.Mesh(geom));
+
+        leafFaceMeshes.push(faces);
+    });
+
+    function findLeaf(position: Vector3): number {
+
+        let i = 0;
+
+        while (i >= 0) {
+            let node = bsp.nodes[i];
+            const plane = bsp.planes[node.plane];
+            const p = new Plane(new Vector3(plane.y, plane.z, plane.x), plane.dist);
+            const d = p.normal.dot(position) - p.constant;
+            i = (d > 0) ? node.front : node.back;
+        }
+
+        return -(i + 1);
+    }
+
+    scene.add(levelMesh);
 
     //Entity representations
     const baseGeometry = new THREE.BufferGeometry().fromGeometry(new THREE.BoxGeometry(10, 10, 10))
@@ -182,9 +290,12 @@ async function loadMap(buffer: ArrayBuffer) {
 
         switch (entity.classname) {
             case "light":
-                const light = new THREE.PointLight(0xffffff, .25, 400);
-                light.position.set(y, z, x);
-                scene.add(light);
+                if (lightSources < LIGHT_LIMIT) {
+                    const light = new THREE.PointLight(0xffffff, .25, 400);
+                    light.position.set(y, z, x);
+                    scene.add(light);
+                    lightSources++;
+                }
                 break;
             // case "info_player_start":
 
@@ -259,13 +370,67 @@ async function loadMap(buffer: ArrayBuffer) {
         controls.invertMouseY = !controls.invertMouseY;
     });
 
+    // function hideMeshes() {
+    //     leafFaceMeshes.forEach(leaf => {
+    //         leaf.forEach(face => face.material = defaultMaterial);
+    //     });
+    //     nodes.forEach(node => node.visible = false);
+    //     leaves.forEach(leaf => leaf.visible = false);
+    // }
+
+    function getVisibilityList(leafIndex: number): number[] {
+        if (leafIndex <= 0) return [];
+        const leaf = bsp.leaves[leafIndex];
+
+        let v = leaf.vislist;
+        let pvs = 1;
+
+        const leafIndices = [];
+
+        while (pvs < bsp.leaves.length) {
+            // zeroes are RLE
+            if (bsp.visibility[v] === 0) {
+                // skip some leaves
+                pvs += (8 * bsp.visibility[v + 1]);
+                v++; // skip the encoded part
+            }
+            else // tag 8 leaves, if needed
+            { // examine bits right to left
+                for (let bit = 1; bit < Math.pow(2, 8); bit = bit * 2) {
+                    if ((bsp.visibility[v] & bit) > 0)
+                        if (pvs < bsp.leaves.length) {
+                            leafIndices.push(pvs);
+                            // leaves[pvs].visible = true;
+                        }
+                    pvs++;
+                }
+            }
+
+            v++;
+        }
+
+        return leafIndices;
+    }
+
+
     const render = function () {
         const delta = clock.getDelta();
         stats.begin();
+        // hideMeshes();
+        const leaf = findLeaf(camera.position);
+        // const visibleLeaves = getVisibilityList(leaf);
+
+        // visibleLeaves.forEach(leafIndex => {
+        //     leafFaceMeshes[leafIndex].forEach(face => {
+        //         face.material = activeMaterial;
+        //     });
+        // });
+
         renderer.render(scene, camera);
         stats.end();
         controls.update(delta);
         requestAnimationFrame(render);
+
     };
 
     render();

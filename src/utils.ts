@@ -1,7 +1,7 @@
 // Copied from https://github.com/mrdoob/three.js/blob/master/examples/jsm/utils/BufferGeometryUtils.js
 
 import * as THREE from "three";
-import { Vector3, Face3 } from "three";
+import { Vector3, Face3, Vector2 } from "three";
 
 /**
 	 * @param  {Array<BufferGeometry>} geometries
@@ -171,4 +171,19 @@ export function triangulate(vertices: Vector3[]): THREE.Face3[] {
         faces.push(new Face3(0, i, i + 1));
     }
     return faces;
+}
+
+export function triangulateUV(UVs: Vector2[]): Vector2[][] {
+    UVs = UVs.reverse();
+
+    if (UVs.length < 3) {
+        return [];
+    }
+
+    const UVOut: Vector2[][] = [];
+    for (let i = 1; i < UVs.length - 1; i++) {
+        UVOut.push([UVs[0], UVs[i], UVs[i + 1]]);
+    }
+    
+    return UVOut;
 }

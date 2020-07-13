@@ -32,10 +32,22 @@ export interface Lump {
     size: number;
 }
 
-interface Vector3D {
-    x: number;
-    y: number;
-    z: number;
+export interface Node {
+    plane: number;
+    front: number;
+    back: number;
+    bbox: [Vector3, Vector3];
+    face: number; // First face
+    faces: number; // Number of faces
+}
+
+interface Leaf {
+    type: number;
+    vislist: number;
+    bbox: [Vector3, Vector3];
+    face: number;
+    faces: number;
+    ambient: number[];
 }
 
 interface Face {
@@ -91,9 +103,9 @@ interface Texture {
 }
 
 interface TexInfo {
-    vs: number[];
+    vs: Vector3;
     sShift: number;
-    vt: number[];
+    vt: Vector3;
     tShift: number;
     mipTex: number;
     flags: number;
@@ -101,7 +113,10 @@ interface TexInfo {
 
 export interface BSP {
     header: Header;
-    vertices: Vector3D[];
+    nodes: Node[];
+    leaves: Leaf[];
+    visibility: number[];
+    vertices: Vector3[];
     edges: number[][];
     planes: Plane[];
     faces: Face[];
@@ -166,28 +181,57 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
     const lumps = header.lumps;
 
     console.table(lumps);
-
+    
+    const edges = extractLump(buffer, lumps["EDGES"], ["Uint16", "Uint16"]);
+    const planes = extractLump(buffer, lumps["PLANES"], ["Float32", "Float32", "Float32", "Float32", "Uint32"]).map(data => {
+        return {
+            x: data[0],
+            y: data[1],
+            z: data[2],
+            dist: data[3],
+            type: data[4]
+        }
+    });
+    const surfEdges = extractLump(buffer, lumps["SURFEDGES"], ["Int32"]);
+    
     // Entities is a special case
     const entityLump = lumps["ENTITIES"];
     const entityString = Buffer.from(buffer.slice(entityLump.offset, entityLump.offset + entityLump.size)).toString("ascii");
     const entities = parseEntities(entityString);
-
+    
     const vertices = extractLump(buffer, lumps["VERTICES"], ["Float32", "Float32", "Float32"]).map(vertex => {
+        return new Vector3(vertex[0], vertex[1], vertex[2]);
+    });
+
+    const nodes: Node[] = extractLump(buffer, lumps["NODES"], ["Uint32", "Int16", "Int16", "Int16", "Int16", "Int16", "Int16", "Int16", "Int16", "Uint16", "Uint16"]).map(data => {
         return {
-            x: vertex[0],
-            y: vertex[1],
-            z: vertex[2]
+            plane: data[0],
+            front: data[1],
+            back: data[2],
+            bbox: [new Vector3(data[3], data[4], data[5]), new Vector3(data[6], data[7], data[8])],
+            face: data[9],
+            faces: data[10]
         }
     });
 
-    const edges = extractLump(buffer, lumps["EDGES"], ["Uint16", "Uint16"]);
-    const planes = extractLump(buffer, lumps["PLANES"], ["Float32", "Float32", "Float32", "Float32", "Uint32"]);
-    const surfEdges = extractLump(buffer, lumps["SURFEDGES"], ["Int32"]);
+    const leaves: Leaf[] = extractLump(buffer, lumps["LEAVES"], ["Int32", "Int32", "Int16", "Int16", "Int16", "Int16", "Int16", "Int16", "Uint16", "Uint16", "Uint8", "Uint8", "Uint8", "Uint8"]).map(data => {
+        return {
+            type: data[0],
+            vislist: data[1],
+            bbox: [new Vector3(data[2], data[3], data[4]), new Vector3(data[5], data[6], data[7])],
+            face: data[8],
+            faces: data[9],
+            ambient: [data[10], data[11], data[12], data[13]]
+        }
+    });
+
+    const visibility: number[] = extractLump(buffer, lumps["VISIBILITY"], ["Uint8"]);
+
     const texInfo = extractLump(buffer, lumps["TEXINFO"], ["Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Uint32", "Uint32"]).map(data => {
         return {
-            vs: [data[0], data[1], data[2]],
+            vs: new Vector3(data[0], data[1], data[2]),
             sShift: data[3],
-            vt: [data[4], data[5], data[6]],
+            vt: new Vector3(data[4], data[5], data[6]),
             tShift: data[7],
             mipTex: data[8],
             flags: data[9]
@@ -242,9 +286,9 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
             const offset8 = data[5];
             const pixels1 = new Uint8Array(buffer.slice(o + offset1, o + offset1 + width * height));
             const pixels2 = new Uint8Array(buffer.slice(o + offset2, o + offset2 + Math.floor((width * height) / 4)));
-            const pixels4 = new Uint8Array(buffer.slice(o + offset4, o + offset4 + Math.floor((width * height) / 8)));
-            const pixels8 = new Uint8Array(buffer.slice(o + offset8, o + offset8 + Math.floor((width * height) / 16)));
-            const palleteOffset = o + offset8 + Math.floor((width * height) / 16);
+            const pixels4 = new Uint8Array(buffer.slice(o + offset4, o + offset4 + Math.floor((width * height) / 16)));
+            const pixels8 = new Uint8Array(buffer.slice(o + offset8, o + offset8 + Math.floor((width * height) / 64)));
+            const palleteOffset = o + offset8 + Math.floor((width * height) / 64) + 2;
             const paletteArray = new Uint8Array(buffer.slice(palleteOffset, palleteOffset + (256 * 3)));
             const palette: number[][] = [];
             for (let i = 0; i < 256; i++) {
@@ -267,12 +311,14 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
             }
         });
 
-        console.log(data);
         textures.push(...data);
     });
 
     const bsp: BSP = {
         header,
+        nodes,
+        leaves,
+        visibility,
         vertices,
         edges,
         planes,
