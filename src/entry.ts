@@ -29,7 +29,6 @@ const controls = new Controls(camera, renderer.domElement);
 const raycaster = new THREE.Raycaster();
 
 renderer.setSize(window.innerWidth, window.innerHeight);
-
 viewElement.appendChild(renderer.domElement);
 
 window.onresize = () => {
@@ -112,16 +111,30 @@ async function loadMap(buffer: ArrayBuffer) {
         const t = new Uint8Array(buffer.slice(mip, mip + (texture.width * texture.height)));
 
         const data = [];
+        let transparent = false;
 
         for (let i = 0; i < t.length; i++) {
-            data.push(texture.palette[t[i]][0]);
-            data.push(texture.palette[t[i]][1]);
-            data.push(texture.palette[t[i]][2]);
+            const r = texture.palette[t[i]][0];
+            const g = texture.palette[t[i]][1];
+            const b = texture.palette[t[i]][2];
+            data.push(r, g, b);
+
+            // Build alphaMap. 0x0000FF means transparent
+            if (r === 0 && g === 0 && b === 255) {
+                data.push(0);
+                transparent = true;
+            }
+            else {
+                data.push(255);
+            }
         }
 
-        const dataTexture = new THREE.DataTexture(new Uint8Array(data), texture.width, texture.height, THREE.RGBFormat);
+        const dataTexture = new THREE.DataTexture(new Uint8Array(data), texture.width, texture.height, THREE.RGBAFormat);
         dataTexture.wrapS = dataTexture.wrapT = THREE.RepeatWrapping;
-        return new THREE.MeshStandardMaterial({ map: dataTexture });
+        return new THREE.MeshStandardMaterial({
+            map: dataTexture,
+            transparent,
+        });
     });
 
     bsp.models.forEach((model, index) => {
