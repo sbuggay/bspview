@@ -6,7 +6,7 @@ import { Controls } from "./Controls";
 import { DescriptionInfo, maps } from "./info/DescriptionInfo";
 import { BspInfo } from "./info/BspInfo";
 import { triangulate, mergeBufferGeometries, triangulateUV } from "./utils";
-import { Vector3, Face3, Mesh, Color, Quaternion, Vector2, Material, Box3, CameraHelper, Plane } from "three";
+import { Vector3, Face3, Mesh, Color, Quaternion, Vector2, Material, Box3, CameraHelper, Plane, Geometry } from "three";
 
 const LIGHT_LIMIT = 8;
 
@@ -90,12 +90,8 @@ async function loadMap(buffer: ArrayBuffer) {
     }
 
     const scene = new THREE.Scene();
-    const light = new THREE.AmbientLight(0xCCCCCC, 0.3);
+    const light = new THREE.AmbientLight(0xFFFFFF, 1.0);
     scene.add(light);
-
-    const near = 10;
-    const far = 2000;
-    scene.fog = new THREE.Fog(0x00000, near, far);
 
     let lightSources = 0;
 
@@ -108,6 +104,25 @@ async function loadMap(buffer: ArrayBuffer) {
     // We are going to store each model's starting face here so not to render it as a normal face
     const modelFaces: { [key: number]: number } = {};
     const modelMeshes: Mesh[] = [];
+
+    // Build materials
+    const materials = bsp.textures.map((texture, index) => {
+
+        const mip = texture.globalOffset + texture.offset1;
+        const t = new Uint8Array(buffer.slice(mip, mip + (texture.width * texture.height)));
+
+        const data = [];
+
+        for (let i = 0; i < t.length; i++) {
+            data.push(texture.palette[t[i]][0]);
+            data.push(texture.palette[t[i]][1]);
+            data.push(texture.palette[t[i]][2]);
+        }
+
+        const dataTexture = new THREE.DataTexture(new Uint8Array(data), texture.width, texture.height, THREE.RGBFormat);
+        dataTexture.wrapS = dataTexture.wrapT = THREE.RepeatWrapping;
+        return new THREE.MeshStandardMaterial({ map: dataTexture });
+    });
 
     bsp.models.forEach((model, index) => {
         const depth = Math.abs(model.max[0] - model.min[0]);
@@ -151,21 +166,8 @@ async function loadMap(buffer: ArrayBuffer) {
 
         const texinfo = bsp.texInfo[face.textureInfo];
         const miptex = bsp.textures[texinfo.mipTex];
+
         const uvs = [];
-
-        const mip = miptex.globalOffset + miptex.offset1;
-        const t = new Uint8Array(buffer.slice(mip, mip + (miptex.width * miptex.height)));
-
-        const data = [];
-
-        for (let i = 0; i < t.length; i++) {
-            data.push(miptex.palette[t[i]][0]);
-            data.push(miptex.palette[t[i]][1]);
-            data.push(miptex.palette[t[i]][2]);
-        }
-
-        const tex = new THREE.DataTexture(new Uint8Array(data), miptex.width, miptex.height, THREE.RGBFormat);
-        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
 
         for (let i = 0; i < face.edges; i++) {
 
@@ -193,26 +195,21 @@ async function loadMap(buffer: ArrayBuffer) {
 
         geometry.faces = triangulate(geometry.vertices);
         geometry.faceVertexUvs[0] = triangulateUV(uvs);
-        
+
         geometry.computeFaceNormals();
         geometry.uvsNeedUpdate = true;
 
-        const material = new THREE.MeshStandardMaterial({ map: tex });
-
-        return new THREE.Mesh(geometry, material);
+        return new THREE.Mesh(geometry);
     }
 
     const faceMeshes: Mesh[] = [];
-    const levelMesh = new THREE.Mesh();
-    const leafFaceMeshes: Mesh[][] = [];
-    const leaves: Mesh[] = [];
 
     // First model is always the parent level node
     const levelModel = bsp.models[0];
     const levelNodes = [bsp.nodes[levelModel.nodes[0]]];
     const levelLeaves = [];
 
-    while(levelNodes.length > 0) {
+    while (levelNodes.length > 0) {
         const n = levelNodes.pop();
         const front = n.front;
         const back = n.back;
@@ -232,33 +229,35 @@ async function loadMap(buffer: ArrayBuffer) {
         }
     }
 
+    const geom = new THREE.Geometry();
+
+    const materialOrder: Material[] = [];
+    let textureIndex = 0;
+
     levelLeaves.forEach(leafId => {
         const leaf = bsp.leaves[leafId];
-        const min = new Vector3(leaf.bbox[0].y, leaf.bbox[0].z, leaf.bbox[0].x);
-        const max = new Vector3(leaf.bbox[1].y, leaf.bbox[1].z, leaf.bbox[1].x);
-        const geometry = new THREE.BoxGeometry(max.x - min.x, max.y - min.y, max.z - min.z);
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffaaff, wireframe: true }));
-        mesh.position.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2)
+        //const min = new Vector3(leaf.bbox[0].y, leaf.bbox[0].z, leaf.bbox[0].x);
+        //const max = new Vector3(leaf.bbox[1].y, leaf.bbox[1].z, leaf.bbox[1].x);
+        //const geometry = new THREE.BoxGeometry(max.x - min.x, max.y - min.y, max.z - min.z);
+        //const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffaaff, wireframe: true }));
+        //mesh.position.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2)
 
-        leaves.push(mesh);
-
-        //scene.add(mesh);
+        //leaves.push(mesh);
 
         const faces: Mesh[] = [];
 
-        const geom = new THREE.Geometry();
-
         for (let i = leaf.face; i < leaf.face + leaf.faces; i++) {
+            let face = bsp.faces[i];
             const faceMesh = getGeometryFromFace(i);
             faces.push(faceMesh);
-            geom.mergeMesh(faceMesh);
-            // scene.add(faceMesh);
+            materialOrder.push(faceMesh.material as Material);
+            geom.merge(faceMesh.geometry as Geometry, faceMesh.matrix, bsp.texInfo[face.textureInfo].mipTex);
         }
 
-        scene.add(new THREE.Mesh(geom));
-
-        leafFaceMeshes.push(faces);
     });
+
+    const levelMesh = new THREE.Mesh(geom, materials);
+    scene.add(levelMesh);
 
     function findLeaf(position: Vector3): number {
 
@@ -274,8 +273,6 @@ async function loadMap(buffer: ArrayBuffer) {
 
         return -(i + 1);
     }
-
-    scene.add(levelMesh);
 
     //Entity representations
     const baseGeometry = new THREE.BufferGeometry().fromGeometry(new THREE.BoxGeometry(10, 10, 10))
