@@ -92,11 +92,6 @@ async function loadMap(buffer: ArrayBuffer) {
     const light = new THREE.AmbientLight(0xFFFFFF, 1.0);
     scene.add(light);
 
-    const color = 0x00;  // white
-    const near = NEAR_CLIPPING;
-    const far = FAR_CLIPPING / 4;
-    scene.fog = new THREE.Fog(color, near, far);
-
     let lightSources = 0;
 
     // reset camera position
