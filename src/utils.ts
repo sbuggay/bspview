@@ -1,7 +1,8 @@
 // Copied from https://github.com/mrdoob/three.js/blob/master/examples/jsm/utils/BufferGeometryUtils.js
 
 import * as THREE from "three";
-import { Vector3, Face3, Vector2 } from "three";
+import { Vector3, Face3, Vector2, Plane } from "three";
+import { BSP } from "./bsp";
 
 /**
 	 * @param  {Array<BufferGeometry>} geometries
@@ -186,4 +187,53 @@ export function triangulateUV(UVs: Vector2[]): Vector2[][] {
     }
     
     return UVOut;
+}
+
+export function findLeaf(bsp: BSP, position: Vector3): number {
+
+    let i = 0;
+
+    while (i >= 0) {
+        let node = bsp.nodes[i];
+        const plane = bsp.planes[node.plane];
+        const p = new Plane(new Vector3(plane.y, plane.z, plane.x), plane.dist);
+        const d = p.normal.dot(position) - p.constant;
+        i = (d > 0) ? node.front : node.back;
+    }
+
+    return -(i + 1);
+}
+
+export function getVisibilityList(bsp: BSP, leafIndex: number): number[] {
+    if (leafIndex <= 0) return [];
+    const leaf = bsp.leaves[leafIndex];
+
+    let v = leaf.vislist;
+    let pvs = 1;
+
+    const leafIndices = [];
+
+    while (pvs < bsp.leaves.length) {
+        // zeroes are RLE
+        if (bsp.visibility[v] === 0) {
+            // skip some leaves
+            pvs += (8 * bsp.visibility[v + 1]);
+            v++; // skip the encoded part
+        }
+        else // tag 8 leaves, if needed
+        { // examine bits right to left
+            for (let bit = 1; bit < Math.pow(2, 8); bit = bit * 2) {
+                if ((bsp.visibility[v] & bit) > 0)
+                    if (pvs < bsp.leaves.length) {
+                        leafIndices.push(pvs);
+                        // leaves[pvs].visible = true;
+                    }
+                pvs++;
+            }
+        }
+
+        v++;
+    }
+
+    return leafIndices;
 }
