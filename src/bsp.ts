@@ -1,6 +1,7 @@
 
 import { extract, TypeMapping } from "./binary";
 import { Vector3 } from "three";
+import { quakePalette } from "./palette";
 
 const HEADER30 = [
     "ENTITIES",
@@ -41,7 +42,7 @@ export interface Node {
     faces: number; // Number of faces
 }
 
-interface Leaf {
+export interface Leaf {
     type: number;
     vislist: number;
     bbox: [Vector3, Vector3];
@@ -50,7 +51,7 @@ interface Leaf {
     ambient: number[];
 }
 
-interface Face {
+export interface Face {
     plane: number;
     side: number;
     firstEdge: number;
@@ -125,6 +126,7 @@ export interface BSP {
     texInfo: TexInfo[];
     models: Model[];
     textures: Texture[];
+    lighting: number[][];
 }
 
 function parseHeader(buffer: ArrayBuffer) {
@@ -179,9 +181,6 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
 
     const header = parseHeader(buffer);
     const lumps = header.lumps;
-
-    console.table(lumps);
-    
     const edges = extractLump(buffer, lumps["EDGES"], ["Uint16", "Uint16"]);
     const planes = extractLump(buffer, lumps["PLANES"], ["Float32", "Float32", "Float32", "Float32", "Uint32"]).map(data => {
         return {
@@ -193,12 +192,17 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         }
     });
     const surfEdges = extractLump(buffer, lumps["SURFEDGES"], ["Int32"]);
-    
+
+    // [TODO] This depends on BSP version (1b vs 3b)
+    const lighting = header.id === 30
+        ? extractLump(buffer, lumps["LIGHTING"], ["Uint8", "Uint8", "Uint8"])
+        : extractLump(buffer, lumps["LIGHTING"], ["Uint8"]);
+
     // Entities is a special case
     const entityLump = lumps["ENTITIES"];
     const entityString = Buffer.from(buffer.slice(entityLump.offset, entityLump.offset + entityLump.size)).toString("ascii");
     const entities = parseEntities(entityString);
-    
+
     const vertices = extractLump(buffer, lumps["VERTICES"], ["Float32", "Float32", "Float32"]).map(vertex => {
         return new Vector3(vertex[0], vertex[1], vertex[2]);
     });
@@ -225,8 +229,10 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         }
     });
 
+    // Parse visplane
     const visibility: number[] = extractLump(buffer, lumps["VISIBILITY"], ["Uint8"]);
 
+    // Parse textures
     const texInfo = extractLump(buffer, lumps["TEXINFO"], ["Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Uint32", "Uint32"]).map(data => {
         return {
             vs: new Vector3(data[0], data[1], data[2]),
@@ -238,6 +244,7 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         }
     });
 
+    // Parse models
     const models = extractLump(buffer, lumps["MODELS"], ["Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Float32", "Int32", "Int32", "Int32", "Int32", "Int32", "Int32", "Int32"]).map(data => {
         return {
             min: [data[0], data[1], data[2]],
@@ -250,6 +257,7 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         }
     });
 
+    // Parse faces
     const faces = extractLump(buffer, lumps["FACES"], ["Uint16", "Uint16", "Uint32", "Uint16", "Uint16", "Uint32", "Uint32"]).map(data => {
         return {
             plane: data[0],
@@ -290,10 +298,18 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
             const pixels8 = new Uint8Array(buffer.slice(o + offset8, o + offset8 + Math.floor((width * height) / 64)));
             const palleteOffset = o + offset8 + Math.floor((width * height) / 64) + 2;
             const paletteArray = new Uint8Array(buffer.slice(palleteOffset, palleteOffset + (256 * 3)));
-            const palette: number[][] = [];
-            for (let i = 0; i < 256; i++) {
-                palette.push([paletteArray[i * 3], paletteArray[i * 3 + 1], paletteArray[i * 3 + 2]]);
+            let palette: number[][] = [];
+
+            if (header.id === 30) {
+                for (let i = 0; i < 256; i++) {
+                    palette.push([paletteArray[i * 3], paletteArray[i * 3 + 1], paletteArray[i * 3 + 2]]);
+                }
             }
+            else {
+                palette = quakePalette;
+            }
+
+            
             return {
                 name,
                 width,
@@ -327,7 +343,8 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
         surfEdges,
         texInfo,
         models,
-        textures
+        textures,
+        lighting
     };
 
     return bsp;
