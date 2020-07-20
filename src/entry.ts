@@ -92,6 +92,11 @@ async function loadMap(buffer: ArrayBuffer) {
     const light = new THREE.AmbientLight(0xFFFFFF, 1.0);
     scene.add(light);
 
+    const color = 0x00;  // white
+    const near = NEAR_CLIPPING;
+    const far = FAR_CLIPPING / 4;
+    scene.fog = new THREE.Fog(color, near, far);
+
     let lightSources = 0;
 
     // reset camera position
@@ -104,8 +109,18 @@ async function loadMap(buffer: ArrayBuffer) {
     const modelFaces: { [key: number]: number } = {};
     const modelMeshes: Mesh[] = [];
 
+    var developmentTexture = new THREE.TextureLoader().load("https://tr.rbxcdn.com/7abbcef4149bbcf912ab31eb3e9bfcec/420/420/Decal/Png");
+
+    // immediately use the texture for material creation
+    var developmentMaterial = new THREE.MeshBasicMaterial({ map: developmentTexture });
+
     // Build materials
     const materials = bsp.textures.map((texture, index) => {
+
+        // If offset is 0, texture is in WAD
+        if (texture.offset1 === 0) {
+            return developmentMaterial;
+        }
 
         const mip = texture.globalOffset + texture.offset1;
         const t = new Uint8Array(buffer.slice(mip, mip + (texture.width * texture.height)));
@@ -124,8 +139,6 @@ async function loadMap(buffer: ArrayBuffer) {
             // Set the transparency flag if it's ever hit.
             if (isTransparant(r, g, b) && !transparent) transparent = true;
         }
-
-        console.log(texture.name);
 
         const dataTexture = new THREE.DataTexture(new Uint8Array(data), texture.width, texture.height, THREE.RGBAFormat);
         dataTexture.wrapS = dataTexture.wrapT = THREE.RepeatWrapping;
@@ -222,29 +235,32 @@ async function loadMap(buffer: ArrayBuffer) {
     // First model is always the parent level node
     const levelModel = bsp.models[0];
     const levelNodes = [bsp.nodes[levelModel.nodes[0]]];
-    const levelLeaves = [];
+    const levelLeaves: number[] = [];
 
     while (levelNodes.length > 0) {
         const n = levelNodes.pop();
         const front = n.front;
         const back = n.back;
 
-        if (front < 0) {
-            levelLeaves.push(Math.abs(front) - 1);
-        }
-        else {
-            levelNodes.push(bsp.nodes[front])
+        console.log(n, n.front, n.back);
+
+        function parse(n: number) {
+            // Ignore -1 leaves here, they are dummy leaves
+            if (n < -1) {
+                levelLeaves.push(Math.abs(n) - 1);
+            }
+            else if (n >= 0) {
+                levelNodes.push(bsp.nodes[n])
+            }
         }
 
-        if (back < 0) {
-            levelLeaves.push(Math.abs(back) - 1);
-        }
-        else {
-            levelNodes.push(bsp.nodes[back])
-        }
+        parse(front);
+        parse(back);
     }
 
     const geom = new THREE.Geometry();
+
+    const freq: { [key: number]: number } = {};
 
     levelLeaves.forEach(leafId => {
         const leaf = bsp.leaves[leafId];
@@ -364,7 +380,7 @@ async function loadMap(buffer: ArrayBuffer) {
         // const y = (level.max[0] + level.min[0]) / 2;
 
         // const square = Math.max((level.max[1] - level.min[1]), (level.max[0], level.min[0])) * 0.75;
-        
+
         // orthoCamera.left = -square + x;
         // orthoCamera.right = square + x;
         // orthoCamera.top = square - y;
@@ -374,7 +390,7 @@ async function loadMap(buffer: ArrayBuffer) {
         // orthoCamera.updateProjectionMatrix();
 
         // renderer.render(scene, orthoCamera);
-        
+
         stats.end();
         controls.update(delta);
         requestAnimationFrame(render);
