@@ -84,7 +84,7 @@ export class Controls {
         }
 
         switch (event.keyCode) {
-            case 16: /* shift */ this.movementSpeedMultiplier = .1; break;
+            case 16: /* shift */ this.movementSpeedMultiplier = 3; break;
             case 87: /*W*/ this.moveState.forward = 1; break;
             case 83: /*S*/ this.moveState.back = 1; break;
             case 65: /*A*/ this.moveState.left = 1; break;
@@ -165,7 +165,7 @@ export class Controls {
         this.camera.rotation.setFromQuaternion(this.camera.quaternion, this.camera.rotation.order);
 
 
-    };
+    }
 
     updateMovementVector() {
         var forward = (this.moveState.forward || (false && !this.moveState.back)) ? 1 : 0;
@@ -173,7 +173,7 @@ export class Controls {
         this.moveVector.x = (- this.moveState.left + this.moveState.right);
         this.moveVector.y = (- this.moveState.down + this.moveState.up);
         this.moveVector.z = (- forward + this.moveState.back);
-    };
+    }
 
 
     bind(scope: any, fn: any) {
@@ -187,7 +187,6 @@ export class Controls {
     }
 
     dispose() {
-
         this.domElement.removeEventListener("contextmenu", this.contextmenu, false);
         this.domElement.removeEventListener("mousedown", this._mousedown, false);
         this.domElement.removeEventListener("mousemove", this._mousemove, false);
