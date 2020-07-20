@@ -1,14 +1,15 @@
-import { parseBSP, Node } from "./bsp";
+import { parseBSP, Node, BSP, Face } from "./bsp";
 import * as THREE from "three";
-
 import * as Stats from "stats.js";
 import { Controls } from "./Controls";
 import { DescriptionInfo, maps } from "./info/DescriptionInfo";
 import { BspInfo } from "./info/BspInfo";
-import { triangulate, mergeBufferGeometries, triangulateUV } from "./utils";
-import { Vector3, Face3, Mesh, Color, Quaternion, Vector2, Material, Box3, CameraHelper, Plane, Geometry } from "three";
+import { triangulate, mergeBufferGeometries, triangulateUV, findLeaf } from "./utils";
+import { Vector3, Face3, Mesh, Color, Quaternion, Vector2, Material, Box3, CameraHelper, Plane, Geometry, Matrix4 } from "three";
 
 const LIGHT_LIMIT = 8;
+const NEAR_CLIPPING = 0.1;
+const FAR_CLIPPING = 6000;
 
 const viewElement = document.body;
 const dashboardElement = document.getElementById("dashboard");
@@ -22,8 +23,10 @@ document.body.appendChild(stats.dom);
 var canvas = document.createElement('canvas');
 var context = canvas.getContext('webgl2', { alpha: false });
 
+
 const clock = new THREE.Clock();
-const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 10, 3000);
+const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, NEAR_CLIPPING, FAR_CLIPPING);
+const orthoCamera = new THREE.OrthographicCamera(0, 0, 0, 0, NEAR_CLIPPING, FAR_CLIPPING);
 const renderer = new THREE.WebGLRenderer({ canvas, context });
 const controls = new Controls(camera, renderer.domElement);
 const raycaster = new THREE.Raycaster();
@@ -54,9 +57,6 @@ function registerDragEvents() {
         event.stopPropagation()
     }
 
-    // document.body.addEventListener("dragenter", handlerFunction, false);
-    // document.body.addEventListener("dragleave", handlerFunction, false);
-    // document.body.addEventListener("dragover", handlerFunction, false);
     document.body.addEventListener("drop", drop, false);
 
     function drop(event: DragEvent) {
@@ -111,6 +111,7 @@ async function loadMap(buffer: ArrayBuffer) {
         const t = new Uint8Array(buffer.slice(mip, mip + (texture.width * texture.height)));
 
         const data = [];
+        const isTransparant = (r: number, g: number, b: number) => (r === 0 && g === 0 && b === 255); // Build alphaMap. 0x0000FF means transparent
         let transparent = false;
 
         for (let i = 0; i < t.length; i++) {
@@ -118,22 +119,20 @@ async function loadMap(buffer: ArrayBuffer) {
             const g = texture.palette[t[i]][1];
             const b = texture.palette[t[i]][2];
             data.push(r, g, b);
+            data.push(isTransparant(r, g, b) ? 0 : 255);
 
-            // Build alphaMap. 0x0000FF means transparent
-            if (r === 0 && g === 0 && b === 255) {
-                data.push(0);
-                transparent = true;
-            }
-            else {
-                data.push(255);
-            }
+            // Set the transparency flag if it's ever hit.
+            if (isTransparant(r, g, b) && !transparent) transparent = true;
         }
+
+        console.log(texture.name);
 
         const dataTexture = new THREE.DataTexture(new Uint8Array(data), texture.width, texture.height, THREE.RGBAFormat);
         dataTexture.wrapS = dataTexture.wrapT = THREE.RepeatWrapping;
         return new THREE.MeshStandardMaterial({
             map: dataTexture,
             transparent,
+            vertexColors: true
         });
     });
 
@@ -167,18 +166,17 @@ async function loadMap(buffer: ArrayBuffer) {
         mesh.visible = false;
         nodes.push(mesh);
         scene.add(mesh);
-
     });
 
 
-    function getGeometryFromFace(faceIndex: number) {
+    function getGeometryFromFace(face: Face) {
         const geometry = new THREE.Geometry();
-        const face = bsp.faces[faceIndex];
 
         if (face === undefined) return new THREE.Mesh();
 
         const texinfo = bsp.texInfo[face.textureInfo];
         const miptex = bsp.textures[texinfo.mipTex];
+        const lighting = bsp.lighting[face.lightmapOffset / 3]; // Divided by 3 because the offset is in bytes
 
         const uvs = [];
 
@@ -197,6 +195,10 @@ async function loadMap(buffer: ArrayBuffer) {
 
             const vertex = new THREE.Vector3(v1.y, v1.z, v1.x);
             geometry.vertices.push(vertex);
+
+            if (lighting) {
+                geometry.colors.push(new THREE.Color(lighting[0], lighting[1], lighting[2]));
+            }
 
             const vectorS = new Vector3(texinfo.vs.y, texinfo.vs.z, texinfo.vs.x);
             const vectorT = new Vector3(texinfo.vt.y, texinfo.vt.z, texinfo.vt.x);
@@ -244,51 +246,21 @@ async function loadMap(buffer: ArrayBuffer) {
 
     const geom = new THREE.Geometry();
 
-    const materialOrder: Material[] = [];
-    let textureIndex = 0;
-
     levelLeaves.forEach(leafId => {
         const leaf = bsp.leaves[leafId];
-        //const min = new Vector3(leaf.bbox[0].y, leaf.bbox[0].z, leaf.bbox[0].x);
-        //const max = new Vector3(leaf.bbox[1].y, leaf.bbox[1].z, leaf.bbox[1].x);
-        //const geometry = new THREE.BoxGeometry(max.x - min.x, max.y - min.y, max.z - min.z);
-        //const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffaaff, wireframe: true }));
-        //mesh.position.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2)
 
-        //leaves.push(mesh);
-
-        const faces: Mesh[] = [];
-
-        for (let i = leaf.face; i < leaf.face + leaf.faces; i++) {
-            let face = bsp.faces[i];
-            const faceMesh = getGeometryFromFace(i);
-            faces.push(faceMesh);
-            materialOrder.push(faceMesh.material as Material);
+        for (let faceOffset = 0; faceOffset < leaf.faces; faceOffset++) {
+            const face = bsp.faces[leaf.face + faceOffset];
+            if (!face) return;
+            const faceMesh = getGeometryFromFace(face);
             geom.merge(faceMesh.geometry as Geometry, faceMesh.matrix, bsp.texInfo[face.textureInfo].mipTex);
         }
-
     });
 
-    const levelMesh = new THREE.Mesh(geom, materials);
-    scene.add(levelMesh);
-
-    function findLeaf(position: Vector3): number {
-
-        let i = 0;
-
-        while (i >= 0) {
-            let node = bsp.nodes[i];
-            const plane = bsp.planes[node.plane];
-            const p = new Plane(new Vector3(plane.y, plane.z, plane.x), plane.dist);
-            const d = p.normal.dot(position) - p.constant;
-            i = (d > 0) ? node.front : node.back;
-        }
-
-        return -(i + 1);
-    }
+    scene.add(new THREE.Mesh(geom, materials));
 
     //Entity representations
-    const baseGeometry = new THREE.BufferGeometry().fromGeometry(new THREE.BoxGeometry(10, 10, 10))
+    const baseGeometry = new THREE.BufferGeometry().fromGeometry(new THREE.SphereGeometry(5, 6, 6))
     const entityGeos: any[] = [];
 
     bsp.entities.forEach(entity => {
@@ -380,67 +352,32 @@ async function loadMap(buffer: ArrayBuffer) {
         controls.invertMouseY = !controls.invertMouseY;
     });
 
-    // function hideMeshes() {
-    //     leafFaceMeshes.forEach(leaf => {
-    //         leaf.forEach(face => face.material = defaultMaterial);
-    //     });
-    //     nodes.forEach(node => node.visible = false);
-    //     leaves.forEach(leaf => leaf.visible = false);
-    // }
-
-    function getVisibilityList(leafIndex: number): number[] {
-        if (leafIndex <= 0) return [];
-        const leaf = bsp.leaves[leafIndex];
-
-        let v = leaf.vislist;
-        let pvs = 1;
-
-        const leafIndices = [];
-
-        while (pvs < bsp.leaves.length) {
-            // zeroes are RLE
-            if (bsp.visibility[v] === 0) {
-                // skip some leaves
-                pvs += (8 * bsp.visibility[v + 1]);
-                v++; // skip the encoded part
-            }
-            else // tag 8 leaves, if needed
-            { // examine bits right to left
-                for (let bit = 1; bit < Math.pow(2, 8); bit = bit * 2) {
-                    if ((bsp.visibility[v] & bit) > 0)
-                        if (pvs < bsp.leaves.length) {
-                            leafIndices.push(pvs);
-                            // leaves[pvs].visible = true;
-                        }
-                    pvs++;
-                }
-            }
-
-            v++;
-        }
-
-        return leafIndices;
-    }
-
+    const level = bsp.models[0];
 
     const render = function () {
         const delta = clock.getDelta();
         stats.begin();
-        // hideMeshes();
-        const leaf = findLeaf(camera.position);
-        // const visibleLeaves = getVisibilityList(leaf);
-
-        // visibleLeaves.forEach(leafIndex => {
-        //     leafFaceMeshes[leafIndex].forEach(face => {
-        //         face.material = activeMaterial;
-        //     });
-        // });
 
         renderer.render(scene, camera);
+
+        // const x = (level.max[1] + level.min[1]) / 2;
+        // const y = (level.max[0] + level.min[0]) / 2;
+
+        // const square = Math.max((level.max[1] - level.min[1]), (level.max[0], level.min[0])) * 0.75;
+        
+        // orthoCamera.left = -square + x;
+        // orthoCamera.right = square + x;
+        // orthoCamera.top = square - y;
+        // orthoCamera.bottom = -square - y;
+        // orthoCamera.lookAt(new Vector3(0, -1, 0));
+
+        // orthoCamera.updateProjectionMatrix();
+
+        // renderer.render(scene, orthoCamera);
+        
         stats.end();
         controls.update(delta);
         requestAnimationFrame(render);
-
     };
 
     render();
