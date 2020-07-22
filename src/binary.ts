@@ -1,5 +1,7 @@
 // https://stackoverflow.com/questions/53103695/how-to-read-64-bit-integer-from-an-arraybuffer-dataview-in-javascript
 
+import { parseString } from "./utils";
+
 // DataView.prototype.getUint64 = function (byteOffset: number, littleEndian: boolean) {
 //     // split 64-bit number into two 32-bit parts
 //     const left = this.getUint32(byteOffset, littleEndian);
@@ -22,7 +24,7 @@ export interface TypeMapping {
     Int16: [number, (dataView: DataView, o: number) => number];
     Uint16: [number, (dataView: DataView, o: number) => number];
     Uint8: [number, (dataView: DataView, o: number) => number];
-
+    Char16: [number, (dataView: DataView, o: number) => string];
 }
 
 export const typeMapping: TypeMapping = {
@@ -31,12 +33,14 @@ export const typeMapping: TypeMapping = {
     Int32: [4, (dataView, o) => dataView.getInt32(o, true)],
     Int16: [2, (dataView, o) => dataView.getInt16(o, true)],
     Uint16: [2, (dataView, o) => dataView.getUint16(o, true)],
-    Uint8: [1, (dataView, o) => dataView.getUint8(o)]
+    Uint8: [1, (dataView, o) => dataView.getUint8(o)],
+    Char16: [16, (dataView, o) => parseString(dataView.buffer.slice(o, o + 16))]
 }
 
 export function extract(dataView: DataView, dataTypes: (keyof TypeMapping)[]) {
     const structSize = dataTypes.reduce((acc, v) => acc + typeMapping[v][0], 0);
     const output: any[] = [];
+
     for (let offset = 0; offset < dataView.byteLength; offset += structSize) {
         let struct: any[] = [];
         let o = offset;

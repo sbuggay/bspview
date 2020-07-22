@@ -2,6 +2,7 @@
 import { extract, TypeMapping } from "./binary";
 import { Vector3 } from "three";
 import { quakePalette } from "./palette";
+import { parseString } from "./utils";
 
 const HEADER30 = [
     "ENTITIES",
@@ -61,7 +62,7 @@ export interface Face {
     lightmapOffset: number;
 }
 
-interface Plane {
+export interface Plane {
     x: number;
     y: number;
     z: number;
@@ -69,7 +70,7 @@ interface Plane {
     type: number;
 }
 
-interface Entity {
+export interface Entity {
     origin?: string;
     classname?: string;
     _light?: string;
@@ -77,7 +78,7 @@ interface Entity {
     angle?: number;
 }
 
-interface Model {
+export interface Model {
     min: number[];
     max: number[];
     origin: number[];
@@ -87,7 +88,7 @@ interface Model {
     faces: number;
 }
 
-interface Texture {
+export interface Texture {
     name: string;
     width: number;
     height: number;
@@ -95,15 +96,12 @@ interface Texture {
     offset2: number;
     offset4: number;
     offset8: number;
-    pixels1: Uint8Array;
-    pixels2: Uint8Array;
-    pixels4: Uint8Array;
-    pixels8: Uint8Array;
-    palette: number[][];
-    globalOffset: number; // Offset into the total bsp
+    pixels?: Uint8Array;
+    palette?: number[][];
+    globalOffset?: number; // Offset into the file
 }
 
-interface TexInfo {
+export interface TexInfo {
     vs: Vector3;
     sShift: number;
     vt: Vector3;
@@ -283,7 +281,7 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
 
     textureOffsets.forEach(offset => {
         const o = textureLump.offset + offset;
-        const name = Buffer.from(buffer.slice(o, o + 16)).toString("ascii");
+        const name = parseString(Buffer.from(buffer.slice(o, o + 16)));
         const mipView = new DataView(buffer, o + 16, 24);
         const data = extract(mipView, ["Uint32", "Uint32", "Uint32", "Uint32", "Uint32", "Uint32"]).map(data => {
             const width = data[0];
@@ -292,10 +290,6 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
             const offset2 = data[3];
             const offset4 = data[4];
             const offset8 = data[5];
-            const pixels1 = new Uint8Array(buffer.slice(o + offset1, o + offset1 + width * height));
-            const pixels2 = new Uint8Array(buffer.slice(o + offset2, o + offset2 + Math.floor((width * height) / 4)));
-            const pixels4 = new Uint8Array(buffer.slice(o + offset4, o + offset4 + Math.floor((width * height) / 16)));
-            const pixels8 = new Uint8Array(buffer.slice(o + offset8, o + offset8 + Math.floor((width * height) / 64)));
             const palleteOffset = o + offset8 + Math.floor((width * height) / 64) + 2;
             const paletteArray = new Uint8Array(buffer.slice(palleteOffset, palleteOffset + (256 * 3)));
             let palette: number[][] = [];
@@ -309,7 +303,6 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
                 palette = quakePalette;
             }
 
-            
             return {
                 name,
                 width,
@@ -318,10 +311,6 @@ export function parseBSP(buffer: ArrayBuffer): BSP {
                 offset2,
                 offset4,
                 offset8,
-                pixels1,
-                pixels2,
-                pixels4,
-                pixels8,
                 palette,
                 globalOffset: o
             }

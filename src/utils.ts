@@ -2,7 +2,7 @@
 
 import * as THREE from "three";
 import { Vector3, Face3, Vector2, Plane } from "three";
-import { BSP } from "./bsp";
+import { BSP, Face, Texture } from "./bsp";
 
 /**
 	 * @param  {Array<BufferGeometry>} geometries
@@ -185,7 +185,7 @@ export function triangulateUV(UVs: Vector2[]): Vector2[][] {
     for (let i = 1; i < UVs.length - 1; i++) {
         UVOut.push([UVs[0], UVs[i], UVs[i + 1]]);
     }
-    
+
     return UVOut;
 }
 
@@ -236,4 +236,19 @@ export function getVisibilityList(bsp: BSP, leafIndex: number): number[] {
     }
 
     return leafIndices;
+}
+
+export function parseString(buffer: ArrayBuffer) {
+    const a = new Uint8Array(buffer);
+    const nullIndex = a.indexOf(0);
+    const s = Buffer.from(buffer.slice(0, nullIndex)).toString().toLowerCase();
+    return s;
+}
+
+const specialTextures = [
+    "aaatrigger"
+];
+
+export function isSpecialBrush(texture: Texture) {
+    return specialTextures.includes(texture.name);
 }

@@ -1,11 +1,13 @@
 import { parseBSP, Node, BSP, Face } from "./bsp";
+import { parseWad } from "./wad";
 import * as THREE from "three";
 import * as Stats from "stats.js";
-import { Controls } from "./Controls";
+import { Controls } from "./controls";
 import { DescriptionInfo, maps } from "./info/DescriptionInfo";
 import { BspInfo } from "./info/BspInfo";
-import { triangulate, mergeBufferGeometries, triangulateUV, findLeaf } from "./utils";
+import { triangulate, mergeBufferGeometries, triangulateUV, findLeaf, isSpecialBrush } from "./utils";
 import { Vector3, Face3, Mesh, Color, Quaternion, Vector2, Material, Box3, CameraHelper, Plane, Geometry, Matrix4 } from "three";
+import { WadManager } from "./wadManager";
 
 const LIGHT_LIMIT = 8;
 const NEAR_CLIPPING = 0.1;
@@ -23,7 +25,6 @@ document.body.appendChild(stats.dom);
 var canvas = document.createElement('canvas');
 var context = canvas.getContext('webgl2', { alpha: false });
 
-
 const clock = new THREE.Clock();
 const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, NEAR_CLIPPING, FAR_CLIPPING);
 const orthoCamera = new THREE.OrthographicCamera(0, 0, 0, 0, NEAR_CLIPPING, FAR_CLIPPING);
@@ -33,6 +34,8 @@ const raycaster = new THREE.Raycaster();
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 viewElement.appendChild(renderer.domElement);
+
+const wadManager = new WadManager();
 
 window.onresize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -64,10 +67,22 @@ function registerDragEvents() {
         let files = dt.files;
         const file = files[0];
 
+        // Parse name
+        const format = file.name.slice(file.name.lastIndexOf(".") + 1);
+
         if (file) {
-            (file as any).arrayBuffer().then((buffer: ArrayBuffer) => {
-                loadMap(buffer);
-            });
+            switch (format) {
+                case "bsp":
+                    (file as any).arrayBuffer().then((buffer: ArrayBuffer) => {
+                        loadMap(buffer);
+                    });
+                    break;
+                case "wad":
+                    (file as any).arrayBuffer().then((buffer: ArrayBuffer) => {
+                        wadManager.loadWad(file.name, buffer);
+                    });
+                    break;
+            }
         }
         else {
             console.error("No file found!");
@@ -97,6 +112,7 @@ async function loadMap(buffer: ArrayBuffer) {
     // reset camera position
     camera.position.set(0, 0, 0);
 
+    // Parse and update BSP
     const bsp = parseBSP(buffer);
     bspInfo.update(bsp);
 
@@ -110,11 +126,18 @@ async function loadMap(buffer: ArrayBuffer) {
     var developmentMaterial = new THREE.MeshBasicMaterial({ map: developmentTexture });
 
     // Build materials
-    const materials = bsp.textures.map((texture, index) => {
+    const materials = bsp.textures.map((texture) => {
 
         // If offset is 0, texture is in WAD
         if (texture.offset1 === 0) {
-            return developmentMaterial;
+            const data = wadManager.getTexture(texture.name);
+            const dataTexture = new THREE.DataTexture(data, texture.width, texture.height, THREE.RGBAFormat);
+            dataTexture.wrapS = dataTexture.wrapT = THREE.RepeatWrapping;
+            const material = new THREE.MeshStandardMaterial({
+                map: dataTexture
+            });
+
+            return material;
         }
 
         const mip = texture.globalOffset + texture.offset1;
@@ -144,6 +167,7 @@ async function loadMap(buffer: ArrayBuffer) {
         });
     });
 
+    // Create model debug volumes
     bsp.models.forEach((model, index) => {
         const depth = Math.abs(model.max[0] - model.min[0]);
         const width = Math.abs(model.max[1] - model.min[1]);
@@ -161,30 +185,18 @@ async function loadMap(buffer: ArrayBuffer) {
         modelFaces[model.firstFace] = model.faces;
     });
 
-    const nodes: Mesh[] = [];
-
-    bsp.nodes.forEach(node => {
-
-        const min = new Vector3(node.bbox[0].y, node.bbox[0].z, node.bbox[0].x);
-        const max = new Vector3(node.bbox[1].y, node.bbox[1].z, node.bbox[1].x);
-        const geometry = new THREE.BoxGeometry(max.x - min.x, max.y - min.y, max.z - min.z);
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true }));
-        mesh.position.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2);
-
-        mesh.visible = false;
-        nodes.push(mesh);
-        scene.add(mesh);
-    });
-
-
     function getGeometryFromFace(face: Face) {
         const geometry = new THREE.Geometry();
 
-        if (face === undefined) return new THREE.Mesh();
+        if (face === undefined) return null;
 
         const texinfo = bsp.texInfo[face.textureInfo];
         const miptex = bsp.textures[texinfo.mipTex];
         const lighting = bsp.lighting[face.lightmapOffset / 3]; // Divided by 3 because the offset is in bytes
+
+        if (isSpecialBrush(miptex)) {
+            return null;
+        }
 
         const uvs = [];
 
@@ -222,7 +234,9 @@ async function loadMap(buffer: ArrayBuffer) {
         geometry.computeFaceNormals();
         geometry.uvsNeedUpdate = true;
 
-        return new THREE.Mesh(geometry);
+        const mesh = new THREE.Mesh(geometry);
+
+        return mesh;
     }
 
     const faceMeshes: Mesh[] = [];
@@ -236,8 +250,6 @@ async function loadMap(buffer: ArrayBuffer) {
         const n = levelNodes.pop();
         const front = n.front;
         const back = n.back;
-
-        console.log(n, n.front, n.back);
 
         function parse(n: number) {
             // Ignore -1 leaves here, they are dummy leaves
@@ -263,8 +275,12 @@ async function loadMap(buffer: ArrayBuffer) {
         for (let faceOffset = 0; faceOffset < leaf.faces; faceOffset++) {
             const face = bsp.faces[leaf.face + faceOffset];
             if (!face) return;
+
             const faceMesh = getGeometryFromFace(face);
-            geom.merge(faceMesh.geometry as Geometry, faceMesh.matrix, bsp.texInfo[face.textureInfo].mipTex);
+
+            if (faceMesh !== null) {
+                geom.merge(faceMesh.geometry as Geometry, faceMesh.matrix, bsp.texInfo[face.textureInfo].mipTex);
+            }
         }
     });
 
