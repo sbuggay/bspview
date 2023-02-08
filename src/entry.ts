@@ -1,26 +1,51 @@
-import { parseBSP, Node, BSP, Face } from "./bsp";
-import { parseWad } from "./wad";
+import { parseBSP, Face } from "./bsp";
 import * as THREE from "three";
-import * as Stats from "stats.js";
 import { Controls } from "./controls";
 import { DescriptionInfo, maps } from "./info/DescriptionInfo";
 import { BspInfo } from "./info/BspInfo";
-import { triangulate, mergeBufferGeometries, triangulateUV, findLeaf, isSpecialBrush } from "./utils";
-import { Vector3, Face3, Mesh, Color, Quaternion, Vector2, Material, Box3, CameraHelper, Plane, Geometry, Matrix4 } from "three";
+import { triangulate, mergeBufferGeometries, triangulateUV, isSpecialBrush } from "./utils";
+import { Vector3, Mesh, Vector2, Geometry } from "three";
 import { WadManager } from "./wadManager";
+import { ListApi, Pane } from 'tweakpane';
+import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
+import { FpsGraphBladeApi, FpsGraphController } from "@tweakpane/plugin-essentials";
 
 const LIGHT_LIMIT = 8;
-const NEAR_CLIPPING = 0.1;
-const FAR_CLIPPING = 6000;
+const NEAR_CLIPPING = 0.01;
+const FAR_CLIPPING = 10000;
 
 const viewElement = document.body;
-const dashboardElement = document.getElementById("dashboard");
-const topElement = document.getElementById("top");
-const bottomElement = document.getElementById("bottom");
+// const dashboardElement = document.getElementById("dashboard");
+// const topElement = document.getElementById("top");
+// const bottomElement = document.getElementById("bottom");
 
-var stats = new Stats();
-stats.showPanel(0);
-document.body.appendChild(stats.dom);
+const params = {
+    entities: false,
+    models: false
+}
+
+const pane = new Pane();
+pane.registerPlugin(EssentialsPlugin);
+
+// FPS graph
+const fpsGraph = pane.addBlade({
+    view: 'fpsgraph',
+    label: 'fps',
+}) as FpsGraphBladeApi;
+
+const materialBlade = pane.addBlade({
+    view: 'list',
+    label: 'material',
+    options: [
+        { text: 'phong', value: 'phong' },
+        { text: 'normal', value: 'normal' },
+        { text: 'wireframe', value: 'wireframe' },
+    ],
+    value: 'phong'
+}) as ListApi<string>;
+
+const modelInput = pane.addInput(params, 'models');
+const entitiesInput = pane.addInput(params, 'entities');
 
 var canvas = document.createElement('canvas');
 var context = canvas.getContext('webgl2', { alpha: false });
@@ -41,13 +66,13 @@ window.onresize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-const controlElement = new DescriptionInfo(topElement, (event) => {
-    const value = (event.target as HTMLSelectElement).value;
-    const url = `https://devanbuggay.com/bspview/bsp/${value}`;
-    loadMapFromUrl(url);
-});
+// const controlElement = new DescriptionInfo(topElement, (event) => {
+//     const value = (event.target as HTMLSelectElement).value;
+//     const url = `https://devanbuggay.com/bspview/bsp/${value}`;
+//     loadMapFromUrl(url);
+// });
 
-const bspInfo = new BspInfo(bottomElement);
+// const bspInfo = new BspInfo(bottomElement);
 
 
 function registerDragEvents() {
@@ -114,7 +139,7 @@ async function loadMap(buffer: ArrayBuffer) {
 
     // Parse and update BSP
     const bsp = parseBSP(buffer);
-    bspInfo.update(bsp);
+    // bspInfo.update(bsp);
 
     // We are going to store each model's starting face here so not to render it as a normal face
     const modelFaces: { [key: number]: number } = {};
@@ -284,7 +309,8 @@ async function loadMap(buffer: ArrayBuffer) {
         }
     });
 
-    scene.add(new THREE.Mesh(geom, materials));
+    const mergedMesh = new THREE.Mesh(geom, materials);
+    scene.add(mergedMesh);
 
     //Entity representations
     const baseGeometry = new THREE.BufferGeometry().fromGeometry(new THREE.SphereGeometry(5, 6, 6))
@@ -306,9 +332,10 @@ async function loadMap(buffer: ArrayBuffer) {
                     lightSources++;
                 }
                 break;
-            // case "info_player_start":
-
-            //     break;
+            case "info_player_start":
+                camera.position.set(y, z, x);
+                camera.rotateY(entity.angle / 360 * 2 * Math.PI);
+                break;
         }
 
         var geometry = baseGeometry.clone()
@@ -327,18 +354,17 @@ async function loadMap(buffer: ArrayBuffer) {
 
     // Register hotkeys
 
-    let viewMode = 0; // 0 - phong, 1 - normal, 2 - wireframe
-    controls.registerHotkey(49, () => { // 1
-        viewMode = (viewMode + 1) % 3;
+    materialBlade.on('change', (ev) => {
         let material: THREE.Material = null;
-        switch (viewMode) {
-            case 0:
+        switch (ev.value) {
+            case 'phong':
+            default:
                 material = new THREE.MeshPhongMaterial()
                 break;
-            case 1:
+            case 'normal':
                 material = new THREE.MeshNormalMaterial();
                 break;
-            case 2:
+            case 'wireframe':
                 material = new THREE.MeshBasicMaterial({ wireframe: true });
                 break;
         }
@@ -347,20 +373,17 @@ async function loadMap(buffer: ArrayBuffer) {
             material = new THREE.MeshBasicMaterial();
         }
 
-        faceMeshes.forEach(face => {
-            face.material = material;
-            face.updateMatrix()
-        });
+        mergedMesh.material = material;
     });
 
-    controls.registerHotkey(50, () => { // 2
+    modelInput.on('change', (ev) => {
         modelMeshes.forEach(model => {
             model.visible = !model.visible;
         });
     });
 
-    controls.registerHotkey(51, () => { // 3
-        entityMesh.visible = !entityMesh.visible;
+    entitiesInput.on('change', (ev) => {
+        entityMesh.visible = ev.value;
     });
 
     controls.registerHotkey(81, () => { // Q
@@ -383,26 +406,29 @@ async function loadMap(buffer: ArrayBuffer) {
 
     const render = function () {
         const delta = clock.getDelta();
-        stats.begin();
+
+        fpsGraph.begin();
 
         renderer.render(scene, camera);
 
-        // const x = (level.max[1] + level.min[1]) / 2;
-        // const y = (level.max[0] + level.min[0]) / 2;
+        // const x = (level.max[1] - level.min[1]) / 2;
+        // const y = (level.max[0] - level.min[0]) / 2;
 
         // const square = Math.max((level.max[1] - level.min[1]), (level.max[0], level.min[0])) * 0.75;
 
-        // orthoCamera.left = -square + x;
-        // orthoCamera.right = square + x;
-        // orthoCamera.top = square - y;
-        // orthoCamera.bottom = -square - y;
-        // orthoCamera.lookAt(new Vector3(0, -1, 0));
+        // orthoCamera.left = -square;
+        // orthoCamera.right = square;
+        // orthoCamera.top = square;
+        // orthoCamera.bottom = -square;
+        // orthoCamera.position.set(5000, 5000, 5000);
+        // orthoCamera.lookAt(new Vector3(0, 0, 0));
 
         // orthoCamera.updateProjectionMatrix();
 
         // renderer.render(scene, orthoCamera);
 
-        stats.end();
+        fpsGraph.end();
+
         controls.update(delta);
         requestAnimationFrame(render);
     };
@@ -411,5 +437,5 @@ async function loadMap(buffer: ArrayBuffer) {
 }
 
 registerDragEvents();
-loadMapFromUrl(`https://devanbuggay.com/bspview/bsp/${maps[0]}`);
+loadMapFromUrl(`/bsp/${maps[0]}`);
 

@@ -163,8 +163,6 @@ export class Controls {
 
         // expose the rotation vector for convenience
         this.camera.rotation.setFromQuaternion(this.camera.quaternion, this.camera.rotation.order);
-
-
     }
 
     updateMovementVector() {
