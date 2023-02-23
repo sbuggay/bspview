@@ -1,14 +1,12 @@
 import { parseBSP, Face } from "./bsp";
 import * as THREE from "three";
-import { Controls } from "./controls";
-import { DescriptionInfo, maps } from "./info/DescriptionInfo";
-import { BspInfo } from "./info/BspInfo";
+import { Controls } from "./Controls";
 import { triangulate, mergeBufferGeometries, triangulateUV, isSpecialBrush } from "./utils";
 import { Vector3, Mesh, Vector2, Geometry } from "three";
-import { WadManager } from "./wadManager";
+import { WadManager } from "./WadManager";
 import { ListApi, Pane } from 'tweakpane';
 import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
-import { FpsGraphBladeApi, FpsGraphController } from "@tweakpane/plugin-essentials";
+import { FpsGraphBladeApi } from "@tweakpane/plugin-essentials";
 
 const LIGHT_LIMIT = 8;
 const NEAR_CLIPPING = 0.01;
@@ -115,10 +113,13 @@ function registerDragEvents() {
     }
 }
 
-async function loadMapFromUrl(url: string) {
+async function loadMapFromURL(url: string) {
     const response = await fetch(url);
     const buffer = await response.arrayBuffer();
-    loadMap(buffer);
+
+    if (buffer.byteLength > 0) {
+        loadMap(buffer);
+    }
 }
 
 async function loadMap(buffer: ArrayBuffer) {
@@ -145,9 +146,7 @@ async function loadMap(buffer: ArrayBuffer) {
     const modelFaces: { [key: number]: number } = {};
     const modelMeshes: Mesh[] = [];
 
-    var developmentTexture = new THREE.TextureLoader().load("https://tr.rbxcdn.com/7abbcef4149bbcf912ab31eb3e9bfcec/420/420/Decal/Png");
-
-    // immediately use the texture for material creation
+    var developmentTexture = new THREE.TextureLoader().load("http://localhost:3000/missing.png");
     var developmentMaterial = new THREE.MeshBasicMaterial({ map: developmentTexture });
 
     // Build materials
@@ -437,5 +436,6 @@ async function loadMap(buffer: ArrayBuffer) {
 }
 
 registerDragEvents();
-loadMapFromUrl(`/bsp/${maps[0]}`);
+// loadMapFromUrl(`/bsp/${maps[0]}`);
+loadMapFromURL('http://localhost:3000/bsp/de_cbble.bsp');
 

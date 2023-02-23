@@ -150,8 +150,7 @@ export class Controls {
 
 
     update(delta: any) {
-
-        var moveMult = delta * this.movementSpeed;
+        var moveMult = delta * this.movementSpeed * this.movementSpeedMultiplier;
         var rotMult = delta * this.rollSpeed;
 
         this.camera.translateX(this.moveVector.x * moveMult);
