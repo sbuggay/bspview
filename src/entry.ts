@@ -1,4 +1,4 @@
-import { parseBSP, Face } from "./bsp";
+import { Face, Bsp } from "./bsp";
 import * as THREE from "three";
 import { Controls } from "./Controls";
 import { triangulate, mergeBufferGeometries, triangulateUV, isSpecialBrush } from "./utils";
@@ -13,9 +13,6 @@ const NEAR_CLIPPING = 0.01;
 const FAR_CLIPPING = 10000;
 
 const viewElement = document.body;
-// const dashboardElement = document.getElementById("dashboard");
-// const topElement = document.getElementById("top");
-// const bottomElement = document.getElementById("bottom");
 
 const params = {
     entities: false,
@@ -139,7 +136,7 @@ async function loadMap(buffer: ArrayBuffer) {
     camera.position.set(0, 0, 0);
 
     // Parse and update BSP
-    const bsp = parseBSP(buffer);
+    const bsp = new Bsp(buffer);
     // bspInfo.update(bsp);
 
     // We are going to store each model's starting face here so not to render it as a normal face
@@ -155,13 +152,19 @@ async function loadMap(buffer: ArrayBuffer) {
         // If offset is 0, texture is in WAD
         if (texture.offset1 === 0) {
             const data = wadManager.getTexture(texture.name);
-            const dataTexture = new THREE.DataTexture(data, texture.width, texture.height, THREE.RGBAFormat);
-            dataTexture.wrapS = dataTexture.wrapT = THREE.RepeatWrapping;
-            const material = new THREE.MeshStandardMaterial({
-                map: dataTexture
-            });
 
-            return material;
+            if (data) {
+                const dataTexture = new THREE.DataTexture(data, texture.width, texture.height, THREE.RGBAFormat);
+                dataTexture.wrapS = dataTexture.wrapT = THREE.RepeatWrapping;
+                const material = new THREE.MeshStandardMaterial({
+                    map: dataTexture
+                });
+
+                return material;
+            }
+            else {
+                return developmentMaterial;
+            }
         }
 
         const mip = texture.globalOffset + texture.offset1;

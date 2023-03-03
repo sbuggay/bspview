@@ -11,6 +11,7 @@
     "tweakpane": "^3.1.4"
   },
   "devDependencies": {
+    "@types/node": "^18.14.4",
     "@types/stats.js": "^0.17.0",
     "@types/three": "^0.103.2",
     "buffer": "^5.7.1",

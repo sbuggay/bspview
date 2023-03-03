@@ -1,4 +1,4 @@
-import { parseWad, Wad } from "./wad";
+import { Wad } from "./wad";
 import { Texture } from "./bsp";
 
 export class WadManager {
@@ -11,7 +11,7 @@ export class WadManager {
 
     loadWad(name: string, buffer: ArrayBuffer) {
         // Name isn't actually used by the system
-        const wad = parseWad(buffer);
+        const wad = Wad.parseWad(buffer);
 
         console.log(`WAD Loaded: ${name}`);
         this.wads.unshift(wad);
