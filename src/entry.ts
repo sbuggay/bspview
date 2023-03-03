@@ -1,4 +1,4 @@
-import { Face, Bsp } from "./bsp";
+import { Face, Bsp } from "./Bsp";
 import * as THREE from "three";
 import { Controls } from "./Controls";
 import { triangulate, mergeBufferGeometries, triangulateUV, isSpecialBrush } from "./utils";
@@ -50,7 +50,6 @@ const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerH
 const orthoCamera = new THREE.OrthographicCamera(0, 0, 0, 0, NEAR_CLIPPING, FAR_CLIPPING);
 const renderer = new THREE.WebGLRenderer({ canvas, context });
 const controls = new Controls(camera, renderer.domElement);
-const raycaster = new THREE.Raycaster();
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 viewElement.appendChild(renderer.domElement);
@@ -138,16 +137,20 @@ async function loadMap(buffer: ArrayBuffer) {
     // Parse and update BSP
     const bsp = new Bsp(buffer);
     // bspInfo.update(bsp);
+    const worldSpawn = bsp.getWorldspawn();
+    const requiredWadsStr = (worldSpawn as any).wad as string;
+    const requiredWads = requiredWadsStr.split(';').map(fullPath => fullPath.split('\\').slice(-1));
+    console.log(requiredWads);
 
     // We are going to store each model's starting face here so not to render it as a normal face
     const modelFaces: { [key: number]: number } = {};
     const modelMeshes: Mesh[] = [];
 
-    var developmentTexture = new THREE.TextureLoader().load("http://localhost:3000/missing.png");
-    var developmentMaterial = new THREE.MeshBasicMaterial({ map: developmentTexture });
-
     // Build materials
     const materials = bsp.textures.map((texture) => {
+
+        const developmentTexture = new THREE.TextureLoader().load("http://localhost:3000/missing.png");
+        developmentTexture.wrapS = developmentTexture.wrapT = THREE.RepeatWrapping;
 
         // If offset is 0, texture is in WAD
         if (texture.offset1 === 0) {
@@ -163,6 +166,8 @@ async function loadMap(buffer: ArrayBuffer) {
                 return material;
             }
             else {
+                var developmentMaterial = new THREE.MeshBasicMaterial({ map: developmentTexture });
+
                 return developmentMaterial;
             }
         }
@@ -388,18 +393,6 @@ async function loadMap(buffer: ArrayBuffer) {
         entityMesh.visible = ev.value;
     });
 
-    controls.registerHotkey(81, () => { // Q
-        // Highlight center face
-        raycaster.setFromCamera(new Vector2(0, 0), camera);
-        const intersects = raycaster.intersectObjects(scene.children);
-        if (intersects.length > 0) {
-            const closestObject = intersects[0].object as THREE.Mesh;
-            if (closestObject.geometry instanceof THREE.Geometry) {
-                console.log(closestObject.geometry.faceVertexUvs);
-            }
-        }
-    });
-
     controls.registerHotkey(220, () => {  // \
         controls.invertMouseY = !controls.invertMouseY;
     });
@@ -439,6 +432,5 @@ async function loadMap(buffer: ArrayBuffer) {
 }
 
 registerDragEvents();
-// loadMapFromUrl(`/bsp/${maps[0]}`);
-loadMapFromURL('http://localhost:3000/bsp/de_cbble.bsp');
+
 

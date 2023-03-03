@@ -2,7 +2,7 @@
 
 import * as THREE from "three";
 import { Vector3, Face3, Vector2, Plane } from "three";
-import { BSP, Face, Texture } from "./bsp";
+import { Bsp, Texture } from "./bsp";
 
 /**
 	 * @param  {Array<BufferGeometry>} geometries
@@ -189,7 +189,7 @@ export function triangulateUV(UVs: Vector2[]): Vector2[][] {
     return UVOut;
 }
 
-export function findLeaf(bsp: BSP, position: Vector3): number {
+export function findLeaf(bsp: Bsp, position: Vector3): number {
 
     let i = 0;
 
@@ -204,7 +204,7 @@ export function findLeaf(bsp: BSP, position: Vector3): number {
     return -(i + 1);
 }
 
-export function getVisibilityList(bsp: BSP, leafIndex: number): number[] {
+export function getVisibilityList(bsp: Bsp, leafIndex: number): number[] {
     if (leafIndex <= 0) return [];
     const leaf = bsp.leaves[leafIndex];
 

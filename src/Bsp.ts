@@ -322,4 +322,8 @@ export class Bsp {
     }
 
 
+    // Grabs the worldspawn entity
+    getWorldspawn() {
+        return this.entities.filter(entity => entity.classname === 'worldspawn')[0];
+    }
 }

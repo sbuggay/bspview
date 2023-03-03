@@ -3,18 +3,19 @@ import { Texture } from "./bsp";
 
 export class WadManager {
 
-    wads: Wad[];
+    private wads: Record<string, Wad>;
 
     constructor() {
-        this.wads = [];
+        this.wads = {};
     }
 
     loadWad(name: string, buffer: ArrayBuffer) {
-        // Name isn't actually used by the system
+        // Name isn't actually used by the system, this is supposed to be a chain but for simplicity
+        // let's store it by name.
         const wad = Wad.parseWad(buffer);
 
         console.log(`WAD Loaded: ${name}`);
-        this.wads.unshift(wad);
+        this.wads[name] = wad;
     }
 
     getTextureData(texture: Texture): Uint8Array {
@@ -39,10 +40,10 @@ export class WadManager {
 
     getTexture(name: string) {
         // Loop over loaded wads until we find a texture with the same name
-    
-        for (const wad of this.wads) {
-            if (wad.textures[name]) {
-                return this.getTextureData(wad.textures[name]);
+
+        for (const wadName in this.wads) {
+            if (this.wads[wadName]?.textures[name]) {
+                return this.getTextureData(this.wads[wadName].textures[name]);
             }
         }
 
@@ -50,5 +51,4 @@ export class WadManager {
 
         return null;
     }
-
 }
