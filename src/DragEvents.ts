@@ -2,7 +2,6 @@ import { WadManager } from "./WadManager";
 
 export class DragEvents {
 
-    // TODO: Take a Map
     constructor(loadMap: (_: ArrayBuffer) => void, wadManager: WadManager) {
         ["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
             document.body.addEventListener(eventName, this.preventDefaults, false);
@@ -11,8 +10,8 @@ export class DragEvents {
         document.body.addEventListener("drop", drop, false);
 
         async function drop(event: DragEvent) {
-            let dt = event.dataTransfer;
-            let files = dt.files;
+            const dt = event.dataTransfer;
+            const files = dt.files;
             const file = files[0];
 
             if (!file) {

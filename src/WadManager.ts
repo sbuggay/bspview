@@ -2,11 +2,14 @@ import { Wad } from "./Wad";
 import { Texture } from "./Bsp";
 
 export class WadManager {
-
     private wads: Map<string, Wad>;
 
     constructor() {
         this.wads = new Map<string, Wad>();
+    }
+
+    names() {
+        return this.wads.keys;
     }
 
     load(name: string, buffer: ArrayBuffer) {
@@ -24,16 +27,30 @@ export class WadManager {
         this.wads.clear();
     }
 
-    getTextureData(texture: Texture): Uint8Array {
+    find(name: string) {
+        // Loop over loaded wads until we find a texture with the same name
 
+        for (const [name, wad] of this.wads) {
+            if (wad.textures[name]) {
+                return this.data(wad.textures[name]);
+            }
+        }
+
+        console.warn(`Texture not found: ${name}`);
+
+        return null;
+    }
+
+    private data(texture: Texture): Uint8Array {
         const data = [];
-        const isTransparant = (r: number, g: number, b: number) => (r === 0 && g === 0 && b === 255); // Build alphaMap. 0x0000FF means transparent
+        const isTransparant = (r: number, g: number, b: number) =>
+            r === 0 && g === 0 && b === 255; // Build alphaMap. 0x0000FF means transparent
         let transparent = false;
 
         for (let i = 0; i < texture.pixels.length; i++) {
-            const r = texture.palette[texture.pixels[i]][0];
-            const g = texture.palette[texture.pixels[i]][1];
-            const b = texture.palette[texture.pixels[i]][2];
+            const r = texture.palette[texture.pixels[i]].r;
+            const g = texture.palette[texture.pixels[i]].g;
+            const b = texture.palette[texture.pixels[i]].b;
             data.push(r, g, b);
             data.push(isTransparant(r, g, b) ? 0 : 255);
 
@@ -42,19 +59,5 @@ export class WadManager {
         }
 
         return new Uint8Array(data);
-    }
-
-    getTexture(name: string) {
-        // Loop over loaded wads until we find a texture with the same name
-
-        for (const [name, wad] of this.wads) {
-            if (wad.textures[name]) {
-                return this.getTextureData(wad.textures[name]);
-            }
-        }
-
-        console.warn(`Texture not found: ${name}`);
-
-        return null;
     }
 }

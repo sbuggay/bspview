@@ -9,22 +9,21 @@ export const maps = [
     "de_dust2.bsp",
     "de_inferno.bsp",
     "de_cbble.bsp",
-    "quake_start.bsp"
+    "quake_start.bsp",
 ];
 
 export class DescriptionInfo {
-
     public element: HTMLElement;
     public detailsElement: HTMLElement;
     public select: HTMLSelectElement;
 
-    constructor(element: HTMLElement, callback: ((evt: Event) => any)) {
+    constructor(element: HTMLElement, callback: (evt: Event) => any) {
         this.element = element;
         this.select = document.createElement("select");
         this.select.style.width = "320px";
         this.select.style.fontSize = "1.5em";
 
-        maps.forEach(map => {
+        maps.forEach((map) => {
             const option = document.createElement("option");
             option.text = map;
             this.select.add(option);
@@ -53,13 +52,12 @@ export class DescriptionInfo {
         const github = document.createElement("a");
         github.href = "https://github.com/sbuggay/bspview";
         github.innerText = "https://github.com/sbuggay/bspview";
-        
+
         const githubDiv = document.createElement("div");
         githubDiv.appendChild(github);
         githubDiv.style.paddingTop = "20px";
 
         this.detailsElement.appendChild(githubDiv);
-        
     }
 
     addText(data: string) {
@@ -68,5 +66,4 @@ export class DescriptionInfo {
         div.innerText = data;
         this.detailsElement.appendChild(div);
     }
-
 }

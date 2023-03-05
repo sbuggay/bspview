@@ -1,5 +1,6 @@
+import { TypedDataView } from "./TypedDataView";
 import { Texture } from "./bsp";
-import { extract } from "./binary";
+import { Palette } from "./palette";
 
 const magic = 0x57414433;
 
@@ -34,12 +35,11 @@ function parseHeader(buffer: ArrayBuffer): Header {
     return {
         id,
         textures,
-        offset
+        offset,
     };
 }
 
 export class Wad {
-
     public header: Header;
     public textures: Record<string, Texture>;
 
@@ -47,8 +47,18 @@ export class Wad {
         this.header = parseHeader(buffer);
 
         const start = this.header.offset;
-        const end = this.header.offset + (LUMP_SIZE * (this.header.textures));
-        const data = extract(new DataView(buffer.slice(start, end)), ["Uint32", "Uint32", "Uint32", "Uint8", "Uint8", "Uint16", "Char16"]);
+        const end = this.header.offset + LUMP_SIZE * this.header.textures;
+        const data = new TypedDataView(
+            new DataView(buffer.slice(start, end))
+        ).asTypes([
+            "Uint32",
+            "Uint32",
+            "Uint32",
+            "Uint8",
+            "Uint8",
+            "Uint16",
+            "Char16",
+        ]);
         const dirs = data.map((entry): Lump => {
             return {
                 offset: entry[0],
@@ -56,12 +66,22 @@ export class Wad {
                 size: entry[2],
                 type: entry[3],
                 compressed: entry[4], // Skip over entry[5] it's padding
-                name: entry[6]
-            }
+                name: entry[6],
+            };
         });
 
         const tex = dirs.map((dir): Texture => {
-            const data = extract(new DataView(buffer, dir.offset, TEXTURE_SIZE), ["Char16", "Uint32", "Uint32", "Uint32", "Uint32", "Uint32", "Uint32"])[0];
+            const data = new TypedDataView(
+                new DataView(buffer, dir.offset, TEXTURE_SIZE)
+            ).asTypes([
+                "Char16",
+                "Uint32",
+                "Uint32",
+                "Uint32",
+                "Uint32",
+                "Uint32",
+                "Uint32",
+            ])[0];
 
             return {
                 name: dir.name,
@@ -72,27 +92,29 @@ export class Wad {
                 offset4: data[5],
                 offset8: data[6],
                 palette: null,
-                globalOffset: dir.offset
-            }
+                globalOffset: dir.offset,
+            };
         });
 
         const textures: { [key: string]: Texture } = {};
 
-        tex.forEach(t => {
+        tex.forEach((t) => {
             const mip = t.globalOffset + t.offset1;
-            t.pixels = new Uint8Array(buffer.slice(mip, mip + (t.width * t.height)));
+            t.pixels = new Uint8Array(
+                buffer.slice(mip, mip + t.width * t.height)
+            );
 
             console.log(t.name);
 
-            const palleteOffset = t.globalOffset + t.offset8 + Math.floor((t.width * t.height) / 64) + 2;
-            const paletteArray = new Uint8Array(buffer.slice(palleteOffset, palleteOffset + (256 * 3)));
-            let palette: number[][] = [];
-
-            for (let i = 0; i < 256; i++) {
-                palette.push([paletteArray[i * 3], paletteArray[i * 3 + 1], paletteArray[i * 3 + 2]]);
-            }
-
-            t.palette = palette;
+            const palleteOffset =
+                t.globalOffset +
+                t.offset8 +
+                Math.floor((t.width * t.height) / 64) +
+                2;
+            const paletteArray = new Uint8Array(
+                buffer.slice(palleteOffset, palleteOffset + 256 * 3)
+            );
+            t.palette = new Palette(Array.from(paletteArray)).colors();
 
             textures[t.name] = t;
         });
