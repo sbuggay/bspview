@@ -1,21 +1,27 @@
-import { Wad } from "./wad";
-import { Texture } from "./bsp";
+import { Wad } from "./Wad";
+import { Texture } from "./Bsp";
 
 export class WadManager {
 
-    private wads: Record<string, Wad>;
+    private wads: Map<string, Wad>;
 
     constructor() {
-        this.wads = {};
+        this.wads = new Map<string, Wad>();
     }
 
-    loadWad(name: string, buffer: ArrayBuffer) {
-        // Name isn't actually used by the system, this is supposed to be a chain but for simplicity
-        // let's store it by name.
-        const wad = Wad.parseWad(buffer);
+    load(name: string, buffer: ArrayBuffer) {
+        const wad = new Wad(buffer);
 
         console.log(`WAD Loaded: ${name}`);
-        this.wads[name] = wad;
+        this.wads.set(name, wad);
+    }
+
+    remove(name: string) {
+        this.wads.delete(name);
+    }
+
+    clear() {
+        this.wads.clear();
     }
 
     getTextureData(texture: Texture): Uint8Array {
@@ -41,9 +47,9 @@ export class WadManager {
     getTexture(name: string) {
         // Loop over loaded wads until we find a texture with the same name
 
-        for (const wadName in this.wads) {
-            if (this.wads[wadName]?.textures[name]) {
-                return this.getTextureData(this.wads[wadName].textures[name]);
+        for (const [name, wad] of this.wads) {
+            if (wad.textures[name]) {
+                return this.getTextureData(wad.textures[name]);
             }
         }
 
