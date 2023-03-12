@@ -1,5 +1,19 @@
 import { Wad } from "./Wad";
 import { Texture } from "./Bsp";
+import {
+    DataTexture,
+    MeshStandardMaterial,
+    RepeatWrapping,
+    RGBAFormat,
+    TextureLoader,
+} from "three";
+import { QuakeTexture } from "./QuakeTexture";
+
+// eslint-disable-next-line
+const missing = require("../docs/missing.png");
+
+const developmentTexture = new TextureLoader().load(missing);
+developmentTexture.wrapS = developmentTexture.wrapT = RepeatWrapping;
 
 export class WadManager {
     private wads: Map<string, Wad>;
@@ -31,33 +45,25 @@ export class WadManager {
         // Loop over loaded wads until we find a texture with the same name
 
         for (const [name, wad] of this.wads) {
-            if (wad.textures[name]) {
-                return this.data(wad.textures[name]);
+            const texture = wad.textures[name];
+            if (texture) {
+                const qt = this.data(texture);
+                const dataTexture = new DataTexture(
+                    qt.data(),
+                    texture.width,
+                    texture.height,
+                    RGBAFormat
+                );
+                return dataTexture;
             }
         }
 
         console.warn(`Texture not found: ${name}`);
 
-        return null;
+        return developmentTexture;
     }
 
-    private data(texture: Texture): Uint8Array {
-        const data = [];
-        const isTransparant = (r: number, g: number, b: number) =>
-            r === 0 && g === 0 && b === 255; // Build alphaMap. 0x0000FF means transparent
-        let transparent = false;
-
-        for (let i = 0; i < texture.pixels.length; i++) {
-            const r = texture.palette[texture.pixels[i]].r;
-            const g = texture.palette[texture.pixels[i]].g;
-            const b = texture.palette[texture.pixels[i]].b;
-            data.push(r, g, b);
-            data.push(isTransparant(r, g, b) ? 0 : 255);
-
-            // Set the transparency flag if it's ever hit.
-            if (isTransparant(r, g, b) && !transparent) transparent = true;
-        }
-
-        return new Uint8Array(data);
+    private data(texture: Texture): QuakeTexture {
+        return new QuakeTexture(texture.palette, texture.pixels);
     }
 }

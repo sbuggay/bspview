@@ -7,7 +7,7 @@ import * as THREE from "three";
 const Vector3 = THREE.Vector3;
 const Quaternion = THREE.Quaternion;
 
-export class Controls {
+export class CameraControls {
     camera: THREE.Camera;
     domElement: HTMLCanvasElement;
     movementSpeed: number;
@@ -35,7 +35,7 @@ export class Controls {
         this.domElement = domElement;
         if (domElement) this.domElement.setAttribute("tabindex", "-1    ");
 
-        this.movementSpeed = 1.0;
+        this.movementSpeed = 300;
         this.rollSpeed = 0.005;
         this.tmpQuaternion = new Quaternion();
 

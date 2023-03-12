@@ -23,28 +23,12 @@ interface Lump {
 const LUMP_SIZE = 144;
 const TEXTURE_SIZE = 16 + 4 * 6;
 
-function parseHeader(buffer: ArrayBuffer): Header {
-    const view = new DataView(buffer);
-    const id = view.getUint32(0, false);
-
-    if (id !== magic) throw new Error("Not a supported WAD");
-
-    const textures = view.getUint32(4, true);
-    const offset = view.getUint32(8, true);
-
-    return {
-        id,
-        textures,
-        offset,
-    };
-}
-
 export class Wad {
     public header: Header;
     public textures: Record<string, Texture>;
 
     constructor(buffer: ArrayBuffer) {
-        this.header = parseHeader(buffer);
+        this.header = this.parseHeader(buffer);
 
         const start = this.header.offset;
         const end = this.header.offset + LUMP_SIZE * this.header.textures;
@@ -120,5 +104,21 @@ export class Wad {
         });
 
         this.textures = textures;
+    }
+
+    private parseHeader(buffer: ArrayBuffer): Header {
+        const view = new DataView(buffer);
+        const id = view.getUint32(0, false);
+    
+        if (id !== magic) throw new Error("Not a supported WAD");
+    
+        const textures = view.getUint32(4, true);
+        const offset = view.getUint32(8, true);
+    
+        return {
+            id,
+            textures,
+            offset,
+        };
     }
 }

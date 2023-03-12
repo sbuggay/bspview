@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Controls } from "./Controls";
+import { CameraControls } from "./CameraControls";
 import { WadManager } from "./WadManager";
 import { ListApi, Pane } from "tweakpane";
 import * as EssentialsPlugin from "@tweakpane/plugin-essentials";
@@ -76,9 +76,7 @@ const orthoCamera = new THREE.OrthographicCamera(
     FAR_CLIPPING
 );
 const renderer = new THREE.WebGLRenderer({ canvas, context });
-const controls = new Controls(camera, renderer.domElement);
-controls.movementSpeed = 300;
-controls.domElement = renderer.domElement;
+const controls = new CameraControls(camera, renderer.domElement);
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 viewElement.appendChild(renderer.domElement);
@@ -86,14 +84,6 @@ viewElement.appendChild(renderer.domElement);
 window.onresize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 };
-
-// const controlElement = new DescriptionInfo(topElement, (event) => {
-//     const value = (event.target as HTMLSelectElement).value;
-//     const url = `https://devanbuggay.com/bspview/bsp/${value}`;
-//     loadMapFromUrl(url);
-// });
-
-// const bspInfo = new BspInfo(bottomElement);
 
 const filePicker = new FilePicker();
 
@@ -127,27 +117,28 @@ async function loadMap(buffer: ArrayBuffer) {
     scene.add(light);
 
     const map = new QuakeMap(buffer, wadManager);
+
     scene.add(map.mesh());
 
     // Register hotkeys
 
-    // materialBlade.on('change', (ev) => {
-    //     let material: THREE.Material = null;
-    //     switch (ev.value) {
-    //         case 'phong':
-    //         default:
-    //             material = new THREE.MeshPhongMaterial()
-    //             break;
-    //         case 'normal':
-    //             material = new THREE.MeshNormalMaterial();
-    //             break;
-    //         case 'wireframe':
-    //             material = new THREE.MeshBasicMaterial({ wireframe: true });
-    //             break;
-    //     }
+    materialBlade.on('change', (ev) => {
+        let material: THREE.Material = null;
+        switch (ev.value) {
+            case 'phong':
+            default:
+                material = new THREE.MeshPhongMaterial()
+                break;
+            case 'normal':
+                material = new THREE.MeshNormalMaterial();
+                break;
+            case 'wireframe':
+                material = new THREE.MeshBasicMaterial({ wireframe: true });
+                break;
+        }
 
-    //     mergedMesh.material = material;
-    // });
+        map.mesh().material = material;
+    });
 
     // modelInput.on('change', (ev) => {
     //     modelMeshes.forEach(model => {
@@ -160,7 +151,6 @@ async function loadMap(buffer: ArrayBuffer) {
     // });
 
     controls.registerHotkey(220, () => {
-        // \
         controls.invertMouseY = !controls.invertMouseY;
     });
 
