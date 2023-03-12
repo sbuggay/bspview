@@ -1,41 +1,27 @@
 import {
-    BoxGeometry,
-    BufferGeometry,
     Color,
     DataTexture,
     Geometry,
-    Matrix4,
     Mesh,
-    MeshBasicMaterial,
-    MeshNormalMaterial,
-    MeshStandardMaterial,
+    MeshPhongMaterial,
     RepeatWrapping,
     RGBAFormat,
-    SphereGeometry,
-    TextureLoader,
     Vector2,
     Vector3,
 } from "three";
-import { Bsp, Entity, Face } from "./Bsp";
+import { Bsp, Face } from "./Bsp";
 import { WadManager } from "./WadManager";
-import {
-    triangulate,
-    mergeBufferGeometries,
-    triangulateUV,
-    isSpecialBrush,
-} from "./utils";
+import { triangulate, triangulateUV, isSpecialBrush } from "./utils";
+import { QuakeTexture } from "./QuakeTexture";
 
 // eslint-disable-next-line
 const missing = require("../docs/missing.png");
 
 export class QuakeMap {
     private bsp: Bsp;
-    private entites: Entity[];
-    private mergedMesh: Mesh;
 
-    public mesh(): Mesh {
-        return this.mergedMesh;
-    }
+    private mergedMesh: Mesh;
+    private requiredWads: string[];
 
     constructor(private buffer: ArrayBuffer, private wadManager: WadManager) {
         // Parse and update BSP
@@ -43,44 +29,22 @@ export class QuakeMap {
         // bspInfo.update(bsp);
         const worldSpawn = this.bsp.getWorldspawn();
         const requiredWadsStr = (worldSpawn as any).wad as string;
-        const requiredWads = requiredWadsStr
+        this.requiredWads = requiredWadsStr
             .split(";")
-            .map((fullPath) => fullPath.split("\\").slice(-1));
-        console.log(requiredWads);
-
-        // We are going to store each model's starting face here so not to render it as a normal face
-        const modelFaces: { [key: number]: number } = {};
-        const modelMeshes: Mesh[] = [];
+            .map((fullPath) => fullPath.split("\\").slice(-1)).flat();
 
         // Build materials
         const materials = this.bsp.textures.map((texture) => {
-            const developmentTexture = new TextureLoader().load(missing);
-            developmentTexture.wrapS = developmentTexture.wrapT =
-                RepeatWrapping;
-
             // If offset is 0, texture is in WAD
             if (texture.offset1 === 0) {
                 const data = this.wadManager.find(texture.name);
 
-                if (data) {
-                    const dataTexture = new DataTexture(
-                        data,
-                        texture.width,
-                        texture.height,
-                        RGBAFormat
-                    );
-                    dataTexture.wrapS = dataTexture.wrapT = RepeatWrapping;
-                    const material = new MeshStandardMaterial({
-                        map: dataTexture,
-                    });
+                data.wrapS = data.wrapT = RepeatWrapping;
+                const material = new MeshPhongMaterial({
+                    map: data,
+                });
 
-                    return material;
-                } else {
-                    const developmentMaterial = new MeshStandardMaterial({
-                        map: developmentTexture,
-                    });
-                    return developmentMaterial;
-                }
+                return material;
             }
 
             const mip = texture.globalOffset + texture.offset1;
@@ -88,61 +52,21 @@ export class QuakeMap {
                 buffer.slice(mip, mip + texture.width * texture.height)
             );
 
-            const data = [];
-            const isTransparant = (r: number, g: number, b: number) =>
-                r === 0 && g === 0 && b === 255; // Build alphaMap. 0x0000FF means transparent
-            let transparent = false;
-
-            for (let i = 0; i < t.length; i++) {
-                const r = texture.palette[t[i]].r;
-                const g = texture.palette[t[i]].g;
-                const b = texture.palette[t[i]].b;
-                data.push(r, g, b);
-                data.push(isTransparant(r, g, b) ? 0 : 255);
-
-                // Set the transparency flag if it's ever hit.
-                if (isTransparant(r, g, b) && !transparent) transparent = true;
-            }
-
+            const quakeTexture = new QuakeTexture(texture.palette, t);
+            
             const dataTexture = new DataTexture(
-                new Uint8Array(data),
+                quakeTexture.data(),
                 texture.width,
                 texture.height,
                 RGBAFormat
             );
             dataTexture.wrapS = dataTexture.wrapT = RepeatWrapping;
-            return new MeshStandardMaterial({
+            return new MeshPhongMaterial({
                 map: dataTexture,
-                transparent,
+                transparent: quakeTexture.transparant(),
                 vertexColors: true,
             });
         });
-
-        // Create model debug volumes
-        this.bsp.models.forEach((model, index) => {
-            const depth = Math.abs(model.max[0] - model.min[0]);
-            const width = Math.abs(model.max[1] - model.min[1]);
-            const height = Math.abs(model.max[2] - model.min[2]);
-            const geometry = new BoxGeometry(width, height, depth);
-
-            const mesh = new Mesh(
-                geometry,
-                new MeshBasicMaterial({ color: 0x00aa11, wireframe: true })
-            );
-            mesh.position.set(
-                (model.max[1] + model.min[1]) / 2,
-                (model.max[2] + model.min[2]) / 2,
-                (model.max[0] + model.min[0]) / 2
-            );
-            mesh.visible = false;
-            modelMeshes.push(mesh);
-
-            // Add to faceStarts
-            if (index === 0) return; // Dont add first face model (is this true for all maps?)
-            modelFaces[model.firstFace] = model.faces;
-        });
-
-        const faceMeshes: Mesh[] = [];
 
         // First model is always the parent level node
         const levelModel = this.bsp.models[0];
@@ -169,8 +93,6 @@ export class QuakeMap {
 
         const geom = new Geometry();
 
-        const freq: { [key: number]: number } = {};
-
         levelLeaves.forEach((leafId) => {
             const leaf = this.bsp.leaves[leafId];
 
@@ -191,29 +113,6 @@ export class QuakeMap {
         });
 
         this.mergedMesh = new Mesh(geom, materials);
-
-        //Entity representations
-        const baseGeometry = new BufferGeometry().fromGeometry(
-            new SphereGeometry(5, 6, 6)
-        );
-        const entityGeos: any[] = [];
-
-        this.bsp.entities.forEach((entity) => {
-            if (!entity.origin) return;
-            const split = entity.origin.split(" ");
-            const x = parseFloat(split[0]);
-            const y = parseFloat(split[1]);
-            const z = parseFloat(split[2]);
-
-            const geometry = baseGeometry.clone();
-            geometry.applyMatrix4(new Matrix4().makeTranslation(y, z, x));
-            // then, we push this bufferGeometry instance in our array
-            entityGeos.push(geometry);
-        });
-
-        const geometriesCubes = mergeBufferGeometries(entityGeos, false);
-        const entityMesh = new Mesh(geometriesCubes, new MeshNormalMaterial());
-        entityMesh.visible = false;
     }
 
     private getGeometryFromFace(face: Face) {
@@ -277,5 +176,13 @@ export class QuakeMap {
         const mesh = new Mesh(geometry);
 
         return mesh;
+    }
+
+    public mesh(): Mesh {
+        return this.mergedMesh;
+    }
+
+    public wads(): string[] {
+        return this.requiredWads;
     }
 }
