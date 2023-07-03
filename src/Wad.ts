@@ -88,8 +88,6 @@ export class Wad {
                 buffer.slice(mip, mip + t.width * t.height)
             );
 
-            console.log(t.name);
-
             const palleteOffset =
                 t.globalOffset +
                 t.offset8 +

@@ -17,6 +17,7 @@ developmentTexture.wrapS = developmentTexture.wrapT = RepeatWrapping;
 
 export class WadManager {
     private wads: Map<string, Wad>;
+    private requiredWads: Record<string, boolean> = {};
 
     constructor() {
         this.wads = new Map<string, Wad>();
@@ -44,7 +45,7 @@ export class WadManager {
     find(name: string) {
         // Loop over loaded wads until we find a texture with the same name
 
-        for (const [name, wad] of this.wads) {
+        for (const [_, wad] of this.wads) {
             const texture = wad.textures[name];
             if (texture) {
                 const qt = this.data(texture);
@@ -61,6 +62,18 @@ export class WadManager {
         console.warn(`Texture not found: ${name}`);
 
         return developmentTexture;
+    }
+
+    public setRequiredWads(wads: string[]) {
+        this.requiredWads = {};
+
+        wads.forEach(wad => {
+            this.requiredWads[wad] = this.wads.has(wad);
+        });
+    }
+
+    public wadState() {
+        return this.requiredWads;
     }
 
     private data(texture: Texture): QuakeTexture {

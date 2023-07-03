@@ -7,6 +7,7 @@ import { FpsGraphBladeApi } from "@tweakpane/plugin-essentials";
 import { FilePicker } from "./FilePicker";
 import { DragEvents } from "./DragEvents";
 import { QuakeMap } from "./QuakeMap";
+import { AmbientLight, BoxGeometry, CubeTextureLoader, Mesh, MeshBasicMaterial, MeshStandardMaterial, Scene } from "three";
 
 const NEAR_CLIPPING = 0.01;
 const FAR_CLIPPING = 10000;
@@ -46,7 +47,7 @@ const modelInput = pane.addInput(params, "models");
 const entitiesInput = pane.addInput(params, "entities");
 
 const wadFolder = pane.addFolder({
-    title: "WAD",
+    title: "WADs",
 });
 
 const wadButton = wadFolder.addButton({
@@ -56,6 +57,11 @@ const wadButton = wadFolder.addButton({
 const clearWadButton = wadFolder.addButton({
     title: "Clear WADs",
 });
+
+const info = pane.addFolder({
+    title: "Info",
+});
+
 
 const canvas = document.createElement("canvas");
 const context = canvas.getContext("webgl2", { alpha: false });
@@ -100,6 +106,7 @@ wadButton.on("click", async () => {
     const file = await filePicker.activate();
     const buffer = await file.arrayBuffer();
     wadManager.load(file.name, buffer);
+    console.log(wadManager.wadState());
 });
 
 async function loadMapFromURL(url: string) {
@@ -111,9 +118,13 @@ async function loadMapFromURL(url: string) {
     }
 }
 
+
+
+
 async function loadMap(buffer: ArrayBuffer) {
-    const scene = new THREE.Scene();
-    const light = new THREE.AmbientLight(0xffffff, 1.0);
+
+    const scene = new Scene();
+    const light = new AmbientLight(0xffffff, 1.0);
     scene.add(light);
 
     const map = new QuakeMap(buffer, wadManager);
@@ -158,16 +169,16 @@ async function loadMap(buffer: ArrayBuffer) {
 
     const render = () => {
         const delta = clock.getDelta();
-
+    
         fpsGraph.begin();
-
+    
         renderer.render(scene, camera);
-
+    
         fpsGraph.end();
-
+    
         controls.update(delta);
         requestAnimationFrame(render);
     };
-
+    
     requestAnimationFrame(render);
 }

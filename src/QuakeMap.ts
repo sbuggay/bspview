@@ -1,9 +1,12 @@
 import {
     Color,
+    CubeTextureLoader,
     DataTexture,
     Geometry,
     Mesh,
+    MeshBasicMaterial,
     MeshPhongMaterial,
+    MeshStandardMaterial,
     RepeatWrapping,
     RGBAFormat,
     Vector2,
@@ -16,6 +19,36 @@ import { QuakeTexture } from "./QuakeTexture";
 
 // eslint-disable-next-line
 const missing = require("../docs/missing.png");
+
+
+function createCubeMap() {
+
+    var file = "http://localhost:3000/neb7";
+    var format = '.bmp';
+    var urls = [
+        file + 'rt' + format, file + 'lf' + format,
+        file + 'up' + format, file + 'dn' + format,
+        file + 'ft' + format, file + 'bk' + format
+    ];
+
+    try {
+        const loader = new CubeTextureLoader();
+        const textureCube = loader.load(urls, () => {}, () => {}, (error) => {
+            console.error(error);
+        });
+        
+        return textureCube;
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+const cubeTexture = createCubeMap();
+cubeTexture.wrapS = cubeTexture.wrapT = RepeatWrapping;
+const skyboxMaterial = new MeshBasicMaterial({
+    envMap: cubeTexture
+});
+
 
 export class QuakeMap {
     private bsp: Bsp;
@@ -31,16 +64,38 @@ export class QuakeMap {
         const requiredWadsStr = (worldSpawn as any).wad as string;
         this.requiredWads = requiredWadsStr
             .split(";")
-            .map((fullPath) => fullPath.split("\\").slice(-1)).flat();
+            .map((fullPath) => fullPath.split("\\").slice(-1))
+            .flat()
+            .filter(wad => wad.length > 0);
+
+        wadManager.setRequiredWads(this.requiredWads);
+
+        // var textureCube = createCubeMap();
+        // var shader = ShaderLib.cube;
+        // shader.uniforms['envMap'].value = textureCube;
+        // console.log(shader.uniforms);
+        // // shader.uniforms["tCube"].value = textureCube;
+        // var cubeTest = new ShaderMaterial({
+        //     fragmentShader: shader.fragmentShader,
+        //     vertexShader: shader.vertexShader,
+        //     uniforms: shader.uniforms,
+        //     depthWrite: false,
+        //     side: BackSide
+        // });
 
         // Build materials
         const materials = this.bsp.textures.map((texture) => {
+
+            if (texture.name === 'sky') {
+                return skyboxMaterial;
+            }
+
             // If offset is 0, texture is in WAD
             if (texture.offset1 === 0) {
                 const data = this.wadManager.find(texture.name);
 
                 data.wrapS = data.wrapT = RepeatWrapping;
-                const material = new MeshPhongMaterial({
+                const material = new MeshStandardMaterial({
                     map: data,
                 });
 
@@ -53,7 +108,7 @@ export class QuakeMap {
             );
 
             const quakeTexture = new QuakeTexture(texture.palette, t);
-            
+
             const dataTexture = new DataTexture(
                 quakeTexture.data(),
                 texture.width,
@@ -62,7 +117,8 @@ export class QuakeMap {
             );
             dataTexture.wrapS = dataTexture.wrapT = RepeatWrapping;
             return new MeshPhongMaterial({
-                map: dataTexture,
+                // map: dataTexture,
+                envMap: dataTexture,
                 transparent: quakeTexture.transparant(),
                 vertexColors: true,
             });
