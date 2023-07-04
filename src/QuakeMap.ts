@@ -21,35 +21,6 @@ import { QuakeTexture } from "./QuakeTexture";
 const missing = require("../docs/missing.png");
 
 
-function createCubeMap() {
-
-    var file = "http://localhost:3000/neb7";
-    var format = '.bmp';
-    var urls = [
-        file + 'rt' + format, file + 'lf' + format,
-        file + 'up' + format, file + 'dn' + format,
-        file + 'ft' + format, file + 'bk' + format
-    ];
-
-    try {
-        const loader = new CubeTextureLoader();
-        const textureCube = loader.load(urls, () => {}, () => {}, (error) => {
-            console.error(error);
-        });
-        
-        return textureCube;
-    } catch (e) {
-        console.error(e);
-    }
-}
-
-const cubeTexture = createCubeMap();
-cubeTexture.wrapS = cubeTexture.wrapT = RepeatWrapping;
-const skyboxMaterial = new MeshBasicMaterial({
-    envMap: cubeTexture
-});
-
-
 export class QuakeMap {
     private bsp: Bsp;
 
@@ -87,7 +58,7 @@ export class QuakeMap {
         const materials = this.bsp.textures.map((texture) => {
 
             if (texture.name === 'sky') {
-                return skyboxMaterial;
+                // return skyboxMaterial;
             }
 
             // If offset is 0, texture is in WAD

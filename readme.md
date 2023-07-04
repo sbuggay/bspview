@@ -5,7 +5,7 @@
 ![Demo image 3](https://raw.githubusercontent.com/sbuggay/bspview/master/demo/demo2.png)
 
 bspview is a tool to view Quake/GoldSrc maps in your browser. 
-You can see a live demo of this here: https://devanbuggay.com/bspview. I've supplied a few BSP files to explore that can be selected from the dropdown. However, you can also drag and drop any supported .bsp file onto the window to load it.
+You can see a live demo of this here: https://sbuggay.github.io/sbuggay. I've supplied a few BSP files to explore that can be selected from the dropdown. However, you can also drag and drop any supported .bsp file onto the window to load it.
 
 Rendered with [three.js](https://threejs.org/).
 
