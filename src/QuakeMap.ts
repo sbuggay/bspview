@@ -88,8 +88,8 @@ export class QuakeMap {
             );
             dataTexture.wrapS = dataTexture.wrapT = RepeatWrapping;
             return new MeshPhongMaterial({
-                // map: dataTexture,
-                envMap: dataTexture,
+                map: dataTexture,
+                // envMap: dataTexture,
                 transparent: quakeTexture.transparant(),
                 vertexColors: true,
             });

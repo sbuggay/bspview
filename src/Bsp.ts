@@ -1,7 +1,7 @@
 import { TypedDataView, TypeMapping } from "./TypedDataView";
 import { Color, Vector3 } from "three";
 import { parseString } from "./utils";
-import { Palette, QuakePalette } from "./palette";
+import { Palette, QuakePalette } from "./Palette";
 
 const HEADER30 = [
     "ENTITIES",
