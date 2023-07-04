@@ -23,7 +23,7 @@
   "source": "src/index.html",
   "scripts": {
     "start": "parcel",
-    "build": "parcel build",
+    "build": "parcel build --public-url /bspview --dist-dir docs --no-content-hash --no-source-maps",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
