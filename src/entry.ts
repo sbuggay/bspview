@@ -102,7 +102,7 @@ fileButton.on("click", async () => {
 const wadManager = new WadManager();
 const dragEvents = new DragEvents(loadMap, wadManager);
 
-loadMapFromURL("https://github.com/sbuggay/bspview/raw/master/docs/bsp/de_inferno.bsp");
+loadMapFromURL("/bsp/de_inferno.bsp");
 
 wadButton.on("click", async () => {
     const file = await filePicker.activate();
