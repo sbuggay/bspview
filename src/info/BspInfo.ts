@@ -1,12 +1,11 @@
-import { BSP, Lump } from "../bsp";
+import { Bsp, Lump } from "../Bsp";
 
 const idMapping: { [key: number]: string } = {
     29: "Quake",
-    30: "Half-Life"
-}
+    30: "Half-Life",
+};
 
 export class BspInfo {
-
     element: HTMLDivElement;
 
     constructor(parent: HTMLElement) {
@@ -38,9 +37,11 @@ export class BspInfo {
         this.element.appendChild(div);
     }
 
-    update(bsp: BSP) {
+    update(bsp: Bsp) {
         this.element.innerHTML = "";
-        this.addText(`${idMapping[bsp.header.id]} (BSP id: ${bsp.header.id.toString()})`);
+        this.addText(
+            `${idMapping[bsp.header.id]} (BSP id: ${bsp.header.id.toString()})`
+        );
 
         this.addRow("Entities: ", bsp.entities.length.toString());
         this.addRow("Vertices: ", bsp.vertices.length.toString());

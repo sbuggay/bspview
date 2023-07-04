@@ -1,6 +1,5 @@
 {
     "compilerOptions": {
-        // "module": "system",
         "module":"ES6",
         "target": "ES6",
         "moduleResolution": "node",

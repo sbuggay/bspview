@@ -16,7 +16,6 @@ import { parseString } from "./utils";
 //     return combined;
 // }
 
-
 export interface TypeMapping {
     Float32: [number, (dataView: DataView, o: number) => number];
     Uint32: [number, (dataView: DataView, o: number) => number];
@@ -34,28 +33,42 @@ export const typeMapping: TypeMapping = {
     Int16: [2, (dataView, o) => dataView.getInt16(o, true)],
     Uint16: [2, (dataView, o) => dataView.getUint16(o, true)],
     Uint8: [1, (dataView, o) => dataView.getUint8(o)],
-    Char16: [16, (dataView, o) => parseString(dataView.buffer.slice(o, o + 16))]
-}
+    Char16: [
+        16,
+        (dataView, o) => parseString(dataView.buffer.slice(o, o + 16)),
+    ],
+};
 
-export function extract(dataView: DataView, dataTypes: (keyof TypeMapping)[]) {
-    const structSize = dataTypes.reduce((acc, v) => acc + typeMapping[v][0], 0);
-    const output: any[] = [];
+export class TypedDataView {
+    constructor(private dataView: DataView) {}
 
-    for (let offset = 0; offset < dataView.byteLength; offset += structSize) {
-        let struct: any[] = [];
-        let o = offset;
-        dataTypes.forEach(type => {
-            const mapping = typeMapping[type];
-            struct.push(mapping[1](dataView, o));
-            o += mapping[0];
-        });
+    public asTypes(dataTypes: (keyof TypeMapping)[]) {
+        const structSize = dataTypes.reduce(
+            (acc, v) => acc + typeMapping[v][0],
+            0
+        );
+        const output: any[] = [];
 
-        // If it's only length one, it's safe to assume we want a flattened buffer
-        if (struct.length === 1) {
-            struct = struct[0];
+        for (
+            let offset = 0;
+            offset < this.dataView.byteLength;
+            offset += structSize
+        ) {
+            let struct: any[] = [];
+            let o = offset;
+            dataTypes.forEach((type) => {
+                const mapping = typeMapping[type];
+                struct.push(mapping[1](this.dataView, o));
+                o += mapping[0];
+            });
+
+            // If it's only length one, it's safe to assume we want a flattened buffer
+            if (struct.length === 1) {
+                struct = struct[0];
+            }
+
+            output.push(struct);
         }
-
-        output.push(struct);
+        return output;
     }
-    return output;
 }

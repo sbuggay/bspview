@@ -2,18 +2,19 @@
 
 import * as THREE from "three";
 import { Vector3, Face3, Vector2, Plane } from "three";
-import { BSP, Face, Texture } from "./bsp";
+import { Bsp, Texture } from "./bsp";
 
 /**
-	 * @param  {Array<BufferGeometry>} geometries
-	 * @param  {Boolean} useGroups
-	 * @return {BufferGeometry}
-	 */
+ * @param  {Array<BufferGeometry>} geometries
+ * @param  {Boolean} useGroups
+ * @return {BufferGeometry}
+ */
 export function mergeBufferGeometries(geometries: any[], useGroups: any) {
-
     var isIndexed = geometries[0].index !== null;
     var attributesUsed = new Set(Object.keys(geometries[0].attributes));
-    var morphAttributesUsed = new Set(Object.keys(geometries[0].morphAttributes));
+    var morphAttributesUsed = new Set(
+        Object.keys(geometries[0].morphAttributes)
+    );
     var attributes: any = {};
     var morphAttributes: any = {};
     var morphTargetsRelative = geometries[0].morphTargetsRelative;
@@ -21,7 +22,6 @@ export function mergeBufferGeometries(geometries: any[], useGroups: any) {
     var offset = 0;
 
     for (var i = 0; i < geometries.length; ++i) {
-
         var geometry = geometries[i];
 
         // ensure that all geometries are indexed, or none
@@ -48,7 +48,8 @@ export function mergeBufferGeometries(geometries: any[], useGroups: any) {
 
         // gather .userData
 
-        mergedGeometry.userData.mergedUserData = mergedGeometry.userData.mergedUserData || [];
+        mergedGeometry.userData.mergedUserData =
+            mergedGeometry.userData.mergedUserData || [];
         mergedGeometry.userData.mergedUserData.push(geometry.userData);
 
         if (useGroups) {
@@ -69,7 +70,6 @@ export function mergeBufferGeometries(geometries: any[], useGroups: any) {
     // merge indices
 
     if (isIndexed) {
-
         var indexOffset = 0;
         var mergedIndex = [];
 
@@ -109,7 +109,9 @@ export function mergeBufferGeometries(geometries: any[], useGroups: any) {
                 morphAttributesToMerge.push(morphAttributes[name][j][i]);
             }
 
-            var mergedMorphAttribute = mergeBufferAttributes(morphAttributesToMerge);
+            var mergedMorphAttribute = mergeBufferAttributes(
+                morphAttributesToMerge
+            );
             if (!mergedMorphAttribute) return null;
             mergedGeometry.morphAttributes[name].push(mergedMorphAttribute);
         }
@@ -117,20 +119,17 @@ export function mergeBufferGeometries(geometries: any[], useGroups: any) {
     return mergedGeometry;
 }
 
-
 /**
-	 * @param {Array<BufferAttribute>} attributes
-	 * @return {BufferAttribute}
-	 */
+ * @param {Array<BufferAttribute>} attributes
+ * @return {BufferAttribute}
+ */
 function mergeBufferAttributes(attributes: any) {
-
     var TypedArray;
     var itemSize;
     var normalized;
     var arrayLength = 0;
 
     for (var i = 0; i < attributes.length; ++i) {
-
         var attribute = attributes[i];
 
         if (attribute.isInterleavedBufferAttribute) return null;
@@ -145,7 +144,6 @@ function mergeBufferAttributes(attributes: any) {
         if (normalized !== attribute.normalized) return null;
 
         arrayLength += attribute.array.length;
-
     }
 
     var array = new TypedArray(arrayLength);
@@ -189,8 +187,7 @@ export function triangulateUV(UVs: Vector2[]): Vector2[][] {
     return UVOut;
 }
 
-export function findLeaf(bsp: BSP, position: Vector3): number {
-
+export function findLeaf(bsp: Bsp, position: Vector3): number {
     let i = 0;
 
     while (i >= 0) {
@@ -198,13 +195,13 @@ export function findLeaf(bsp: BSP, position: Vector3): number {
         const plane = bsp.planes[node.plane];
         const p = new Plane(new Vector3(plane.y, plane.z, plane.x), plane.dist);
         const d = p.normal.dot(position) - p.constant;
-        i = (d > 0) ? node.front : node.back;
+        i = d > 0 ? node.front : node.back;
     }
 
     return -(i + 1);
 }
 
-export function getVisibilityList(bsp: BSP, leafIndex: number): number[] {
+export function getVisibilityList(bsp: Bsp, leafIndex: number): number[] {
     if (leafIndex <= 0) return [];
     const leaf = bsp.leaves[leafIndex];
 
@@ -217,11 +214,11 @@ export function getVisibilityList(bsp: BSP, leafIndex: number): number[] {
         // zeroes are RLE
         if (bsp.visibility[v] === 0) {
             // skip some leaves
-            pvs += (8 * bsp.visibility[v + 1]);
+            pvs += 8 * bsp.visibility[v + 1];
             v++; // skip the encoded part
-        }
-        else // tag 8 leaves, if needed
-        { // examine bits right to left
+        } // tag 8 leaves, if needed
+        else {
+            // examine bits right to left
             for (let bit = 1; bit < Math.pow(2, 8); bit = bit * 2) {
                 if ((bsp.visibility[v] & bit) > 0)
                     if (pvs < bsp.leaves.length) {
@@ -245,9 +242,7 @@ export function parseString(buffer: ArrayBuffer) {
     return s;
 }
 
-const specialTextures = [
-    "aaatrigger"
-];
+const specialTextures = ["aaatrigger"];
 
 export function isSpecialBrush(texture: Texture) {
     return specialTextures.includes(texture.name);
