@@ -6,7 +6,7 @@
     "@tweakpane/core": "^1.1.4",
     "@tweakpane/plugin-essentials": "^0.1.7",
     "stats.js": "^0.17.0",
-    "three": "^0.114.0",
+    "three": "^0.125.0",
     "tweakpane": "^3.1.4"
   },
   "devDependencies": {
