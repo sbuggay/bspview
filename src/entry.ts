@@ -43,9 +43,6 @@ const materialBlade = pane.addBlade({
     value: "phong",
 }) as ListApi<string>;
 
-const modelInput = pane.addInput(params, "models");
-const entitiesInput = pane.addInput(params, "entities");
-
 const wadFolder = pane.addFolder({
     title: "WADs",
 });
@@ -58,10 +55,9 @@ const clearWadButton = wadFolder.addButton({
     title: "Clear WADs",
 });
 
-const info = pane.addFolder({
-    title: "Info",
-});
-
+// const info = pane.addFolder({
+//     title: "Info",
+// });
 
 const canvas = document.createElement("canvas");
 const context = canvas.getContext("webgl2", { alpha: false });
@@ -102,7 +98,7 @@ fileButton.on("click", async () => {
 const wadManager = new WadManager();
 const dragEvents = new DragEvents(loadMap, wadManager);
 
-loadMapFromURL("/bspview/bsp/de_inferno.bsp");
+loadMapFromURL("https://sbuggay.github.io/bspview/bsp/de_inferno.bsp");
 
 wadButton.on("click", async () => {
     const file = await filePicker.activate();
@@ -119,6 +115,15 @@ async function loadMapFromURL(url: string) {
         loadMap(buffer);
     }
 }
+
+function checkMobileSupport() {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+        alert('bspview has very limited mobile support');
+    }
+}
+
+checkMobileSupport();
 
 async function loadMap(buffer: ArrayBuffer) {
 
@@ -149,16 +154,6 @@ async function loadMap(buffer: ArrayBuffer) {
 
         map.mesh().material = material;
     });
-
-    // modelInput.on('change', (ev) => {
-    //     modelMeshes.forEach(model => {
-    //         model.visible = !model.visible;
-    //     });
-    // });
-
-    // entitiesInput.on('change', (ev) => {
-    //     entityMesh.visible = ev.value;
-    // });
 
     controls.registerHotkey(220, () => {
         controls.invertMouseY = !controls.invertMouseY;
