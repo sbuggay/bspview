@@ -2,7 +2,6 @@ import { Wad } from "./Wad";
 import { Texture } from "./Bsp";
 import {
     DataTexture,
-    MeshStandardMaterial,
     RepeatWrapping,
     RGBAFormat,
     TextureLoader,

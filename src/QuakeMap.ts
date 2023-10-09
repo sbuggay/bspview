@@ -1,12 +1,10 @@
 import {
     Color,
-    CubeTextureLoader,
     DataTexture,
     Geometry,
     Mesh,
-    MeshBasicMaterial,
     MeshPhongMaterial,
-    MeshStandardMaterial,
+    MeshLambertMaterial,
     RepeatWrapping,
     RGBAFormat,
     Vector2,
@@ -66,7 +64,7 @@ export class QuakeMap {
                 const data = this.wadManager.find(texture.name);
 
                 data.wrapS = data.wrapT = RepeatWrapping;
-                const material = new MeshStandardMaterial({
+                const material = new MeshLambertMaterial({
                     map: data,
                 });
 
@@ -201,6 +199,8 @@ export class QuakeMap {
         geometry.uvsNeedUpdate = true;
 
         const mesh = new Mesh(geometry);
+        mesh.receiveShadow = true;
+        mesh.castShadow = true;
 
         return mesh;
     }
@@ -211,5 +211,9 @@ export class QuakeMap {
 
     public wads(): string[] {
         return this.requiredWads;
+    }
+
+    public bspData(): Bsp {
+        return this.bsp;
     }
 }
