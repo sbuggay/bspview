@@ -1,6 +1,6 @@
 import { TypedDataView } from "./TypedDataView";
-import { Texture } from "./bsp";
-import { Palette } from "./palette";
+import { Texture } from "./Bsp";
+import { Palette } from "./Palette";
 
 const magic = 0x57414433;
 
@@ -107,12 +107,12 @@ export class Wad {
     private parseHeader(buffer: ArrayBuffer): Header {
         const view = new DataView(buffer);
         const id = view.getUint32(0, false);
-    
+
         if (id !== magic) throw new Error("Not a supported WAD");
-    
+
         const textures = view.getUint32(4, true);
         const offset = view.getUint32(8, true);
-    
+
         return {
             id,
             textures,
